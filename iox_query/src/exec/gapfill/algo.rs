@@ -390,20 +390,27 @@ impl Cursor {
         series_ends: &[usize],
         input_time_array: &TimestampNanosecondArray,
     ) -> Result<Vec<Option<i64>>> {
-        let mut times = Vec::with_capacity(self.remaining_output_batch_size);
-        self.build_vec(
-            params,
-            input_time_array,
-            series_ends,
-            |row_status| match row_status {
-                RowStatus::NullTimestamp { .. } => times.push(None),
-                RowStatus::Present { ts, .. } | RowStatus::Missing { ts, .. } => {
-                    times.push(Some(ts))
-                }
-            },
-        )?;
+        struct TimeAppender {
+            times: Vec<Option<i64>>,
+        }
 
-        Ok(times)
+        impl VecAppender for TimeAppender {
+            fn append_value(&mut self, row_status: RowStatus) {
+                match row_status {
+                    RowStatus::NullTimestamp { .. } => self.times.push(None),
+                    RowStatus::Present { ts, .. } | RowStatus::Missing { ts, .. } => {
+                        self.times.push(Some(ts))
+                    }
+                }
+            }
+        }
+
+        let mut appender = TimeAppender {
+            times: Vec::with_capacity(self.remaining_output_batch_size),
+        };
+        self.build_vec(params, input_time_array, series_ends, &mut appender)?;
+
+        Ok(appender.times)
     }
 
     /// Builds a vector that can use the [`take`](take::take) kernel
@@ -414,25 +421,32 @@ impl Cursor {
         series_ends: &[usize],
         input_time_array: &TimestampNanosecondArray,
     ) -> Result<Vec<u64>> {
-        let mut take_idxs = Vec::with_capacity(self.remaining_output_batch_size);
-        self.build_vec(
-            params,
-            input_time_array,
-            series_ends,
-            |row_status| match row_status {
-                RowStatus::NullTimestamp {
-                    series_end_offset, ..
-                }
-                | RowStatus::Present {
-                    series_end_offset, ..
-                }
-                | RowStatus::Missing {
-                    series_end_offset, ..
-                } => take_idxs.push(series_end_offset as u64 - 1),
-            },
-        )?;
+        struct GroupAppender {
+            take_idxs: Vec<u64>,
+        }
 
-        Ok(take_idxs)
+        impl VecAppender for GroupAppender {
+            fn append_value(&mut self, row_status: RowStatus) {
+                match row_status {
+                    RowStatus::NullTimestamp {
+                        series_end_offset, ..
+                    }
+                    | RowStatus::Present {
+                        series_end_offset, ..
+                    }
+                    | RowStatus::Missing {
+                        series_end_offset, ..
+                    } => self.take_idxs.push(series_end_offset as u64 - 1),
+                }
+            }
+        }
+
+        let mut appender = GroupAppender {
+            take_idxs: Vec::with_capacity(self.remaining_output_batch_size),
+        };
+        self.build_vec(params, input_time_array, series_ends, &mut appender)?;
+
+        Ok(appender.take_idxs)
     }
 
     /// Builds a vector that can use the [`take`](take::take) kernel
@@ -443,20 +457,27 @@ impl Cursor {
         series_ends: &[usize],
         input_time_array: &TimestampNanosecondArray,
     ) -> Result<Vec<Option<u64>>> {
-        let mut take_idxs = Vec::with_capacity(self.remaining_output_batch_size);
-        self.build_vec(
-            params,
-            input_time_array,
-            series_ends,
-            |row_status| match row_status {
-                RowStatus::NullTimestamp { offset, .. } | RowStatus::Present { offset, .. } => {
-                    take_idxs.push(Some(offset as u64))
-                }
-                RowStatus::Missing { .. } => take_idxs.push(None),
-            },
-        )?;
+        struct NullFillAppender {
+            take_idxs: Vec<Option<u64>>,
+        }
 
-        Ok(take_idxs)
+        impl VecAppender for NullFillAppender {
+            fn append_value(&mut self, row_status: RowStatus) {
+                match row_status {
+                    RowStatus::NullTimestamp { offset, .. } | RowStatus::Present { offset, .. } => {
+                        self.take_idxs.push(Some(offset as u64))
+                    }
+                    RowStatus::Missing { .. } => self.take_idxs.push(None),
+                }
+            }
+        }
+
+        let mut appender = NullFillAppender {
+            take_idxs: Vec::with_capacity(self.remaining_output_batch_size),
+        };
+        self.build_vec(params, input_time_array, series_ends, &mut appender)?;
+
+        Ok(appender.take_idxs)
     }
 
     /// Builds a vector that can use the [`take`](take::take) kernel
@@ -468,66 +489,75 @@ impl Cursor {
         series_ends: &[usize],
         input_time_array: &TimestampNanosecondArray,
     ) -> Result<Vec<Option<u64>>> {
-        let mut prev_offset = None;
+        struct PrevFillAppender {
+            take_idxs: Vec<Option<u64>>,
+            prev_offset: Option<u64>,
+        }
 
-        let mut take_idxs = Vec::with_capacity(self.remaining_output_batch_size);
-        self.build_vec(
-            params,
-            input_time_array,
-            series_ends,
-            |row_status| match row_status {
-                RowStatus::NullTimestamp { offset, .. } => take_idxs.push(Some(offset as u64)),
-                RowStatus::Present { offset, .. } => {
-                    take_idxs.push(Some(offset as u64));
-                    prev_offset = Some(offset as u64);
+        impl VecAppender for PrevFillAppender {
+            fn append_value(&mut self, row_status: RowStatus) {
+                match row_status {
+                    RowStatus::NullTimestamp { offset, .. } => {
+                        self.take_idxs.push(Some(offset as u64))
+                    }
+                    RowStatus::Present { offset, .. } => {
+                        self.take_idxs.push(Some(offset as u64));
+                        self.prev_offset = Some(offset as u64);
+                    }
+                    RowStatus::Missing { .. } => self.take_idxs.push(self.prev_offset),
                 }
-                RowStatus::Missing { .. } => take_idxs.push(prev_offset),
-            },
-        )?;
+            }
 
-        Ok(take_idxs)
+            fn start_new_series(&mut self) {
+                self.prev_offset = None;
+            }
+        }
+
+        let mut appender = PrevFillAppender {
+            take_idxs: Vec::with_capacity(self.remaining_output_batch_size),
+            prev_offset: None,
+        };
+
+        self.build_vec(params, input_time_array, series_ends, &mut appender)?;
+
+        Ok(appender.take_idxs)
     }
 
     /// Helper method that iterates over each series
     /// that ends with offsets in `series_ends` and produces
     /// the appropriate output values.
-    fn build_vec<F>(
+    fn build_vec<VA: VecAppender>(
         &mut self,
         params: &GapFillParams,
         input_time_array: &TimestampNanosecondArray,
         series_ends: &[usize],
-        mut append: F,
-    ) -> Result<()>
-    where
-        F: FnMut(RowStatus),
-    {
+        appender: &mut VA,
+    ) -> Result<()> {
         let first_series = series_ends.first().ok_or(DataFusionError::Internal(
             "expected at least one item in series batch".to_string(),
         ))?;
 
         // Process the first series separately as it may just be a part of what
         // did not fit in the previous output batch.
-        self.append_series_items(params, input_time_array, *first_series, &mut append)?;
+        self.append_series_items(params, input_time_array, *first_series, appender)?;
 
         for series in series_ends.iter().skip(1) {
+            appender.start_new_series();
             self.next_ts = params.first_ts;
-            self.append_series_items(params, input_time_array, *series, &mut append)?;
+            self.append_series_items(params, input_time_array, *series, appender)?;
         }
         Ok(())
     }
 
     /// Helper method that generates output for one series by invoking
     /// `append` for each output value in the column to be generated.
-    fn append_series_items<F>(
+    fn append_series_items<VA: VecAppender>(
         &mut self,
         params: &GapFillParams,
         input_times: &TimestampNanosecondArray,
         series_end: usize,
-        mut append: F,
-    ) -> Result<()>
-    where
-        F: FnMut(RowStatus),
-    {
+        appender: &mut VA,
+    ) -> Result<()> {
         // If there are any null timestamps for this group, they will be first.
         // These rows can just be copied into the output.
         // Append the corresponding values.
@@ -535,7 +565,7 @@ impl Cursor {
             && self.next_input_offset < series_end
             && input_times.is_null(self.next_input_offset)
         {
-            append(RowStatus::NullTimestamp {
+            appender.append_value(RowStatus::NullTimestamp {
                 series_end_offset: series_end,
                 offset: self.next_input_offset,
             });
@@ -568,13 +598,13 @@ impl Cursor {
                 break;
             }
             while next_ts < in_ts {
-                append(RowStatus::Missing {
+                appender.append_value(RowStatus::Missing {
                     series_end_offset: series_end,
                     ts: next_ts,
                 });
                 next_ts += params.stride;
             }
-            append(RowStatus::Present {
+            appender.append_value(RowStatus::Present {
                 series_end_offset: series_end,
                 offset: self.next_input_offset,
                 ts: next_ts,
@@ -585,7 +615,7 @@ impl Cursor {
 
         // Add any additional missing values after the last of the input.
         while next_ts <= last_ts {
-            append(RowStatus::Missing {
+            appender.append_value(RowStatus::Missing {
                 series_end_offset: series_end,
                 ts: next_ts,
             });
@@ -596,6 +626,15 @@ impl Cursor {
         self.remaining_output_batch_size -= output_row_count;
         Ok(())
     }
+}
+
+/// A trait that lets implementors build the vectors used
+/// to create output Arrow arrays.
+trait VecAppender {
+    /// Called for each row that will appear in the output for a batch.
+    fn append_value(&mut self, _rs: RowStatus);
+    /// Called just before a new series starts.
+    fn start_new_series(&mut self) {}
 }
 
 /// The state of an input row relative to gap-filled output.
@@ -885,7 +924,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cursor_append_aggr_take_prev() -> Result<()> {
+    fn test_cursor_append_aggr_take_prev() {
         let input_times = TimestampNanosecondArray::from(vec![
             // 950
             1000, // 1050
@@ -909,7 +948,7 @@ mod tests {
             remaining_output_batch_size: output_batch_size,
         };
 
-        let take_idxs = cursor.build_aggr_take_vec_fill_prev(&params, &[series], &input_times)?;
+        let take_idxs = cursor.build_aggr_take_vec_fill_prev(&params, &[series], &input_times).unwrap();
         assert_eq!(
             vec![
                 None,    // 950
@@ -931,12 +970,10 @@ mod tests {
             },
             cursor
         );
-
-        Ok(())
     }
 
     #[test]
-    fn test_cursor_append_aggr_take_prev_with_nulls() -> Result<()> {
+    fn test_cursor_append_aggr_take_prev_with_nulls() {
         let input_times = TimestampNanosecondArray::from(vec![
             None,
             None,
@@ -966,7 +1003,7 @@ mod tests {
         };
 
         // Rows with null timestamps never have their aggregate values carried forward.
-        let take_idxs = cursor.build_aggr_take_vec_fill_prev(&params, &[series], &input_times)?;
+        let take_idxs = cursor.build_aggr_take_vec_fill_prev(&params, &[series], &input_times).unwrap();
         assert_eq!(
             vec![
                 Some(0), // null ts
@@ -990,12 +1027,10 @@ mod tests {
             },
             cursor
         );
-
-        Ok(())
     }
 
     #[test]
-    fn test_cursor_append_aggr_take_prev_multi_series() -> Result<()> {
+    fn test_cursor_append_aggr_take_prev_multi_series() {
         let input_times = TimestampNanosecondArray::from(vec![
             // 950
             // 1000
@@ -1024,7 +1059,7 @@ mod tests {
         };
 
         let take_idxs =
-            cursor.build_aggr_take_vec_fill_prev(&params, &series_ends, &input_times)?;
+            cursor.build_aggr_take_vec_fill_prev(&params, &series_ends, &input_times).unwrap();
         assert_eq!(
             vec![
                 None,    // 950
@@ -1044,12 +1079,10 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 7
+                remaining_output_batch_size: output_batch_size - 8
             },
             cursor
         );
-
-        Ok(())
     }
 
     #[test]
