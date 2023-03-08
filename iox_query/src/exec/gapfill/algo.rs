@@ -276,6 +276,11 @@ impl GapFiller {
                     series_ends,
                     input_time_array,
                 ),
+                Some(FillStrategy::Prev) => cursor.build_aggr_take_vec_fill_prev(
+                    &self.params,
+                    series_ends,
+                    input_time_array,
+                ),
                 Some(fs) => Err(DataFusionError::NotImplemented(format!(
                     "unsupported gap fill strategy {fs:?}"
                 ))),
@@ -431,7 +436,7 @@ impl Cursor {
     }
 
     /// Builds a vector that can use the [`take`](take::take) kernel
-    /// to produce an aggregate output column.
+    /// to produce an aggregate output column, filling gaps with null values.
     fn build_aggr_take_vec_fill_null(
         &mut self,
         params: &GapFillParams,
@@ -454,6 +459,35 @@ impl Cursor {
         Ok(take_idxs)
     }
 
+    /// Builds a vector that can use the [`take`](take::take) kernel
+    /// to produce an aggregate output column, filling gaps with the
+    /// previous value for the series that appeared in the input.
+    fn build_aggr_take_vec_fill_prev(
+        &mut self,
+        params: &GapFillParams,
+        series_ends: &[usize],
+        input_time_array: &TimestampNanosecondArray,
+    ) -> Result<Vec<Option<u64>>> {
+        let mut prev_offset = None;
+
+        let mut take_idxs = Vec::with_capacity(self.remaining_output_batch_size);
+        self.build_vec(
+            params,
+            input_time_array,
+            series_ends,
+            |row_status| match row_status {
+                RowStatus::NullTimestamp { offset, .. } => take_idxs.push(Some(offset as u64)),
+                RowStatus::Present { offset, .. } => {
+                    take_idxs.push(Some(offset as u64));
+                    prev_offset = Some(offset as u64);
+                }
+                RowStatus::Missing { .. } => take_idxs.push(prev_offset),
+            },
+        )?;
+
+        Ok(take_idxs)
+    }
+
     /// Helper method that iterates over each series
     /// that ends with offsets in `series_ends` and produces
     /// the appropriate output values.
@@ -462,7 +496,7 @@ impl Cursor {
         params: &GapFillParams,
         input_time_array: &TimestampNanosecondArray,
         series_ends: &[usize],
-        mut f: F,
+        mut append: F,
     ) -> Result<()>
     where
         F: FnMut(RowStatus),
@@ -473,11 +507,11 @@ impl Cursor {
 
         // Process the first series separately as it may just be a part of what
         // did not fit in the previous output batch.
-        self.append_series_items(params, input_time_array, *first_series, &mut f)?;
+        self.append_series_items(params, input_time_array, *first_series, &mut append)?;
 
         for series in series_ends.iter().skip(1) {
             self.next_ts = params.first_ts;
-            self.append_series_items(params, input_time_array, *series, &mut f)?;
+            self.append_series_items(params, input_time_array, *series, &mut append)?;
         }
         Ok(())
     }
@@ -843,6 +877,174 @@ mod tests {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
                 remaining_output_batch_size: output_batch_size - 9
+            },
+            cursor
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cursor_append_aggr_take_prev() -> Result<()> {
+        let input_times = TimestampNanosecondArray::from(vec![
+            // 950
+            1000, // 1050
+            1100, // 1150
+            1200,
+            // 1250
+        ]);
+        let series = input_times.len();
+
+        let params = GapFillParams {
+            stride: 50,
+            first_ts: Some(950),
+            last_ts: 1250,
+            fill_strategy: simple_fill_strategy(),
+        };
+
+        let output_batch_size = 10000;
+        let mut cursor = Cursor {
+            next_input_offset: 0,
+            next_ts: params.first_ts,
+            remaining_output_batch_size: output_batch_size,
+        };
+
+        let take_idxs = cursor.build_aggr_take_vec_fill_prev(&params, &[series], &input_times)?;
+        assert_eq!(
+            vec![
+                None,    // 950
+                Some(0), // 1000
+                Some(0), // 1050
+                Some(1), // 1100
+                Some(1), // 1150
+                Some(2), // 1200
+                Some(2)  // 1250
+            ],
+            take_idxs
+        );
+
+        assert_eq!(
+            Cursor {
+                next_input_offset: input_times.len(),
+                next_ts: Some(params.last_ts + params.stride),
+                remaining_output_batch_size: output_batch_size - 7
+            },
+            cursor
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cursor_append_aggr_take_prev_with_nulls() -> Result<()> {
+        let input_times = TimestampNanosecondArray::from(vec![
+            None,
+            None,
+            // 950,
+            Some(1000),
+            // 1050
+            Some(1100),
+            // 1150
+            Some(1200),
+            // 1250
+            //
+        ]);
+        let series = input_times.len();
+
+        let params = GapFillParams {
+            stride: 50,
+            first_ts: Some(950),
+            last_ts: 1250,
+            fill_strategy: simple_fill_strategy(),
+        };
+
+        let output_batch_size = 10000;
+        let mut cursor = Cursor {
+            next_input_offset: 0,
+            next_ts: params.first_ts,
+            remaining_output_batch_size: output_batch_size,
+        };
+
+        // Rows with null timestamps never have their aggregate values carried forward.
+        let take_idxs = cursor.build_aggr_take_vec_fill_prev(&params, &[series], &input_times)?;
+        assert_eq!(
+            vec![
+                Some(0), // null ts
+                Some(1), // null ts
+                None,    // 950
+                Some(2), // 1000
+                Some(2), // 1050
+                Some(3), // 1100
+                Some(3), // 1150
+                Some(4), // 1200
+                Some(4)  // 1250
+            ],
+            take_idxs
+        );
+
+        assert_eq!(
+            Cursor {
+                next_input_offset: input_times.len(),
+                next_ts: Some(params.last_ts + params.stride),
+                remaining_output_batch_size: output_batch_size - 9
+            },
+            cursor
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cursor_append_aggr_take_prev_multi_series() -> Result<()> {
+        let input_times = TimestampNanosecondArray::from(vec![
+            // 950
+            // 1000
+            Some(1050),
+            // 1100
+            // --- new series
+            // 950
+            // 1000
+            Some(1050),
+            // 1100
+        ]);
+        let series_ends = vec![1, 2];
+
+        let params = GapFillParams {
+            stride: 50,
+            first_ts: Some(950),
+            last_ts: 1100,
+            fill_strategy: simple_fill_strategy(),
+        };
+
+        let output_batch_size = 10000;
+        let mut cursor = Cursor {
+            next_input_offset: 0,
+            next_ts: params.first_ts,
+            remaining_output_batch_size: output_batch_size,
+        };
+
+        let take_idxs =
+            cursor.build_aggr_take_vec_fill_prev(&params, &series_ends, &input_times)?;
+        assert_eq!(
+            vec![
+                None,    // 950
+                None,    // 1000
+                Some(0), // 1050
+                Some(0), // 1100
+                // New series
+                None,    // 950
+                None,    // 1000
+                Some(1), // 1050
+                Some(1), // 1100
+            ],
+            take_idxs
+        );
+
+        assert_eq!(
+            Cursor {
+                next_input_offset: input_times.len(),
+                next_ts: Some(params.last_ts + params.stride),
+                remaining_output_batch_size: output_batch_size - 7
             },
             cursor
         );
