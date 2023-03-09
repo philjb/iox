@@ -159,7 +159,7 @@ impl GapFiller {
 
         let offset = self.cursor.next_input_offset - 1;
         let len = batch.num_rows() - offset;
-        self.cursor.next_input_offset = 1;
+        self.cursor.slice(offset);
 
         Ok(batch.slice(offset, len))
     }
@@ -355,6 +355,13 @@ impl Cursor {
             next_ts: params.first_ts,
             remaining_output_batch_size,
             aggr_col_state,
+        }
+    }
+
+    fn slice(&mut self, offset: usize) {
+        self.next_input_offset -= offset;
+        for (_idx, state) in self.aggr_col_state.iter_mut() {
+            state.slice(offset);
         }
     }
 
@@ -690,6 +697,14 @@ impl AggrColState {
         match self {
             Self::PrevOffset(v) => v.clone(),
             _ => unreachable!(),
+        }
+    }
+
+    fn slice(&mut self, offset: usize) {
+        let offset = offset as u64;
+        match self {
+            Self::PrevOffset(Some(v)) => *v = *v - offset,
+            _ => (),
         }
     }
 }

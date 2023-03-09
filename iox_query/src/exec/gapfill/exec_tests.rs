@@ -628,27 +628,31 @@ fn test_gapfill_fill_prev() {
             };
             let batches = tc.run().unwrap();
             let actual = batches_to_lines(&batches);
-            insta::assert_yaml_snapshot!(actual, @r###"
-            ---
-            - +----+--------------------------+----+
-            - "| g0 | time                     | a0 |"
-            - +----+--------------------------+----+
-            - "| a  | 1970-01-01T00:00:00.975Z |    |"
-            - "| a  | 1970-01-01T00:00:01Z     | 10 |"
-            - "| a  | 1970-01-01T00:00:01.025Z | 10 |"
-            - "| a  | 1970-01-01T00:00:01.050Z | 10 |"
-            - "| a  | 1970-01-01T00:00:01.075Z | 11 |"
-            - "| a  | 1970-01-01T00:00:01.100Z | 11 |"
-            - "| a  | 1970-01-01T00:00:01.125Z | 11 |"
-            - "| b  | 1970-01-01T00:00:00.975Z |    |"
-            - "| b  | 1970-01-01T00:00:01Z     | 20 |"
-            - "| b  | 1970-01-01T00:00:01.025Z | 20 |"
-            - "| b  | 1970-01-01T00:00:01.050Z | 20 |"
-            - "| b  | 1970-01-01T00:00:01.075Z | 21 |"
-            - "| b  | 1970-01-01T00:00:01.100Z | 21 |"
-            - "| b  | 1970-01-01T00:00:01.125Z | 21 |"
-            - +----+--------------------------+----+
-            "###);
+            insta::with_settings!({
+                description => format!("input_batch_size: {input_batch_size}, output_batch_size: {output_batch_size}"),
+            }, {
+                insta::assert_yaml_snapshot!(actual, @r###"
+                ---
+                - +----+--------------------------+----+
+                - "| g0 | time                     | a0 |"
+                - +----+--------------------------+----+
+                - "| a  | 1970-01-01T00:00:00.975Z |    |"
+                - "| a  | 1970-01-01T00:00:01Z     | 10 |"
+                - "| a  | 1970-01-01T00:00:01.025Z | 10 |"
+                - "| a  | 1970-01-01T00:00:01.050Z | 10 |"
+                - "| a  | 1970-01-01T00:00:01.075Z | 11 |"
+                - "| a  | 1970-01-01T00:00:01.100Z | 11 |"
+                - "| a  | 1970-01-01T00:00:01.125Z | 11 |"
+                - "| b  | 1970-01-01T00:00:00.975Z |    |"
+                - "| b  | 1970-01-01T00:00:01Z     | 20 |"
+                - "| b  | 1970-01-01T00:00:01.025Z | 20 |"
+                - "| b  | 1970-01-01T00:00:01.050Z | 20 |"
+                - "| b  | 1970-01-01T00:00:01.075Z | 21 |"
+                - "| b  | 1970-01-01T00:00:01.100Z | 21 |"
+                - "| b  | 1970-01-01T00:00:01.125Z | 21 |"
+                - +----+--------------------------+----+
+                "###)
+            });
             assert_batch_count(&batches, output_batch_size);
         }
     }}
@@ -886,13 +890,15 @@ fn bound_included_from_option<T>(o: Option<T>) -> Bound<T> {
 fn phys_fill_strategies(
     records: &TestRecords,
     fill_strategy: FillStrategy,
-
 ) -> Result<Vec<(Arc<dyn PhysicalExpr>, FillStrategy)>> {
     let start = records.group_cols.len() + 1; // 1 is for time col
     let end = start + records.agg_cols.len();
     let mut v = Vec::with_capacity(records.agg_cols.len());
     for f in records.schema().fields()[start..end].iter() {
-        v.push((phys_col(f.name(), &records.schema())?, fill_strategy.clone()));
+        v.push((
+            phys_col(f.name(), &records.schema())?,
+            fill_strategy.clone(),
+        ));
     }
     Ok(v)
 }
@@ -930,7 +936,7 @@ fn get_params_ms_with_fill_strategy(
     stride: i64,
     start: Option<i64>,
     end: i64,
-    fill_strategy: FillStrategy
+    fill_strategy: FillStrategy,
 ) -> GapFillExecParams {
     GapFillExecParams {
         // interval day time is milliseconds in the low 32-bit word
