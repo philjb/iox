@@ -10,6 +10,7 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use datafusion::error::{DataFusionError, Result};
+use hashbrown::HashMap;
 
 use super::{params::GapFillParams, FillStrategy};
 
@@ -79,11 +80,7 @@ pub(super) struct GapFiller {
 impl GapFiller {
     /// Initialize a [GapFiller] at the beginning of an input record batch.
     pub fn new(params: GapFillParams) -> Self {
-        let cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: 0,
-        };
+        let cursor = Cursor::new(&params);
         Self {
             params,
             cursor,
@@ -249,7 +246,7 @@ impl GapFiller {
         output_arrays.push((time_idx, Arc::new(TimestampNanosecondArray::from(time_vec))));
         // There may not be any aggregate or group columns, so use this cursor state as the new
         // GapFiller cursor once this output batch is complete.
-        let final_cursor = cursor;
+        let mut final_cursor = cursor;
 
         // build the other group columns
         for (idx, ga) in group_arr.iter() {
@@ -270,7 +267,7 @@ impl GapFiller {
         // Build the aggregate columns
         for (idx, aa) in aggr_arr.iter() {
             let mut cursor = self.cursor.clone();
-            let take_vec = match self.params.fill_strategy.get(idx) {
+            let (aggr_col_state, take_vec) = match self.params.fill_strategy.get(idx) {
                 Some(FillStrategy::Null) => cursor.build_aggr_take_vec_fill_null(
                     &self.params,
                     series_ends,
@@ -280,6 +277,7 @@ impl GapFiller {
                     &self.params,
                     series_ends,
                     input_time_array,
+                    *idx,
                 ),
                 Some(fs) => Err(DataFusionError::NotImplemented(format!(
                     "unsupported gap fill strategy {fs:?}"
@@ -297,6 +295,7 @@ impl GapFiller {
             }
             let take_arr = UInt64Array::from(take_vec);
             output_arrays.push((*idx, take::take(aa, &take_arr, None)?));
+            final_cursor.aggr_col_state.insert(*idx, aggr_col_state);
         }
 
         output_arrays.sort_by(|(a, _), (b, _)| a.cmp(b));
@@ -322,9 +321,43 @@ struct Cursor {
     next_ts: Option<i64>,
     /// How many rows may be output before we need to start a new record batch.
     remaining_output_batch_size: usize,
+    aggr_col_state: HashMap<usize, AggrColState>,
 }
 
 impl Cursor {
+    /// Create a new cursor that points at the beginning of an input batch.
+    fn new(params: &GapFillParams) -> Self {
+        let aggr_col_state = params
+            .fill_strategy
+            .iter()
+            .map(|(idx, fs)| (*idx, AggrColState::new(fs)))
+            .collect();
+        Self {
+            next_input_offset: 0,
+            next_ts: params.first_ts,
+            remaining_output_batch_size: 0,
+            aggr_col_state,
+        }
+    }
+
+    #[cfg(test)]
+    /// Create a new cursor that points at the beginning of an input batch.
+    /// Also accepts the batch size, for testing. In practice the output
+    /// batch size is set by [GapFiller].
+    fn with_output_batch_size(params: &GapFillParams, remaining_output_batch_size: usize) -> Self {
+        let aggr_col_state = params
+            .fill_strategy
+            .iter()
+            .map(|(idx, fs)| (*idx, AggrColState::new(fs)))
+            .collect();
+        Self {
+            next_input_offset: 0,
+            next_ts: params.first_ts,
+            remaining_output_batch_size,
+            aggr_col_state,
+        }
+    }
+
     /// Counts the number of rows that will be produced for a series that ends at
     /// `series_end`, including rows that have a null timestamp, if any.
     fn count_series_rows(
@@ -456,7 +489,7 @@ impl Cursor {
         params: &GapFillParams,
         series_ends: &[usize],
         input_time_array: &TimestampNanosecondArray,
-    ) -> Result<Vec<Option<u64>>> {
+    ) -> Result<(AggrColState, Vec<Option<u64>>)> {
         struct NullFillAppender {
             take_idxs: Vec<Option<u64>>,
         }
@@ -477,7 +510,7 @@ impl Cursor {
         };
         self.build_vec(params, input_time_array, series_ends, &mut appender)?;
 
-        Ok(appender.take_idxs)
+        Ok((AggrColState::Null, appender.take_idxs))
     }
 
     /// Builds a vector that can use the [`take`](take::take) kernel
@@ -488,7 +521,8 @@ impl Cursor {
         params: &GapFillParams,
         series_ends: &[usize],
         input_time_array: &TimestampNanosecondArray,
-    ) -> Result<Vec<Option<u64>>> {
+        idx: usize,
+    ) -> Result<(AggrColState, Vec<Option<u64>>)> {
         struct PrevFillAppender {
             take_idxs: Vec<Option<u64>>,
             prev_offset: Option<u64>,
@@ -515,12 +549,16 @@ impl Cursor {
 
         let mut appender = PrevFillAppender {
             take_idxs: Vec::with_capacity(self.remaining_output_batch_size),
-            prev_offset: None,
+            prev_offset: self.aggr_col_state.get(&idx).unwrap().prev_offset(),
         };
 
         self.build_vec(params, input_time_array, series_ends, &mut appender)?;
 
-        Ok(appender.take_idxs)
+        let PrevFillAppender {
+            prev_offset,
+            take_idxs,
+        } = appender;
+        Ok((AggrColState::PrevOffset(prev_offset), take_idxs))
     }
 
     /// Helper method that iterates over each series
@@ -628,6 +666,34 @@ impl Cursor {
     }
 }
 
+/// Captures the state of a aggregate column being filled.
+#[derive(Clone, Debug, PartialEq)]
+enum AggrColState {
+    /// The state of an aggregate column being filled with
+    /// nulls for missing rows. There is no state to save
+    /// for this case.
+    Null,
+    /// The state of an aggregate column being filled with
+    /// a previous value being carried forward.
+    PrevOffset(Option<u64>),
+}
+
+impl AggrColState {
+    fn new(fs: &FillStrategy) -> Self {
+        match fs {
+            FillStrategy::Null => AggrColState::Null,
+            FillStrategy::Prev | FillStrategy::PrevNullAsMissing => AggrColState::PrevOffset(None),
+        }
+    }
+
+    fn prev_offset(&self) -> Option<u64> {
+        match self {
+            Self::PrevOffset(v) => v.clone(),
+            _ => unreachable!(),
+        }
+    }
+}
+
 /// A trait that lets implementors build the vectors used
 /// to create output Arrow arrays.
 trait VecAppender {
@@ -672,6 +738,8 @@ mod tests {
 
     use crate::exec::gapfill::{algo::Cursor, params::GapFillParams, FillStrategy};
 
+    use super::AggrColState;
+
     #[test]
     fn test_cursor_append_time_values() -> Result<()> {
         test_helpers::maybe_start_logging();
@@ -682,15 +750,11 @@ mod tests {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1250,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
 
         let out_times = cursor.build_time_vec(&params, &[series], &input_times)?;
         assert_eq!(
@@ -710,7 +774,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 7
+                remaining_output_batch_size: output_batch_size - 7,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -728,15 +793,11 @@ mod tests {
             stride: 50,
             first_ts: None,
             last_ts: 1250,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
 
         let out_times = cursor
             .build_time_vec(&params, &[series], &input_times)
@@ -750,7 +811,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 4
+                remaining_output_batch_size: output_batch_size - 4,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -767,15 +829,11 @@ mod tests {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1250,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
         let out_times = cursor.build_time_vec(&params, &[series], &input_times)?;
         assert_eq!(
             vec![
@@ -796,7 +854,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 9
+                remaining_output_batch_size: output_batch_size - 9,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -813,15 +872,11 @@ mod tests {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1250,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
         let take_idxs = cursor.build_group_take_vec(&params, &[series], &input_times)?;
         assert_eq!(vec![2; 7], take_idxs);
 
@@ -829,7 +884,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 7
+                remaining_output_batch_size: output_batch_size - 7,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -846,17 +902,14 @@ mod tests {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1250,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
 
-        let take_idxs = cursor.build_aggr_take_vec_fill_null(&params, &[series], &input_times)?;
+        let (_, take_idxs) =
+            cursor.build_aggr_take_vec_fill_null(&params, &[series], &input_times)?;
         assert_eq!(
             vec![None, Some(0), None, Some(1), None, Some(2), None],
             take_idxs
@@ -866,7 +919,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 7
+                remaining_output_batch_size: output_batch_size - 7,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -885,17 +939,14 @@ mod tests {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1250,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
 
-        let take_idxs = cursor.build_aggr_take_vec_fill_null(&params, &[series], &input_times)?;
+        let (_, take_idxs) =
+            cursor.build_aggr_take_vec_fill_null(&params, &[series], &input_times)?;
         assert_eq!(
             vec![
                 Some(0), // corresopnds to null ts
@@ -915,7 +966,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 9
+                remaining_output_batch_size: output_batch_size - 9,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -934,21 +986,20 @@ mod tests {
         ]);
         let series = input_times.len();
 
+        let idx = 0;
         let params = GapFillParams {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1250,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: prev_fill_strategy(idx),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
 
-        let take_idxs = cursor.build_aggr_take_vec_fill_prev(&params, &[series], &input_times).unwrap();
+        let (aggr_col_state, take_idxs) = cursor
+            .build_aggr_take_vec_fill_prev(&params, &[series], &input_times, idx)
+            .unwrap();
         assert_eq!(
             vec![
                 None,    // 950
@@ -966,7 +1017,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 7
+                remaining_output_batch_size: output_batch_size - 7,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -988,22 +1040,21 @@ mod tests {
         ]);
         let series = input_times.len();
 
+        let idx = 0;
         let params = GapFillParams {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1250,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: prev_fill_strategy(idx),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
 
         // Rows with null timestamps never have their aggregate values carried forward.
-        let take_idxs = cursor.build_aggr_take_vec_fill_prev(&params, &[series], &input_times).unwrap();
+        let (aggr_col_state, take_idxs) = cursor
+            .build_aggr_take_vec_fill_prev(&params, &[series], &input_times, idx)
+            .unwrap();
         assert_eq!(
             vec![
                 Some(0), // null ts
@@ -1023,7 +1074,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 9
+                remaining_output_batch_size: output_batch_size - 9,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1044,22 +1096,20 @@ mod tests {
         ]);
         let series_ends = vec![1, 2];
 
+        let idx = 0;
         let params = GapFillParams {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1100,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: prev_fill_strategy(0),
         };
 
         let output_batch_size = 10000;
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
 
-        let take_idxs =
-            cursor.build_aggr_take_vec_fill_prev(&params, &series_ends, &input_times).unwrap();
+        let (aggr_col_state, take_idxs) = cursor
+            .build_aggr_take_vec_fill_prev(&params, &series_ends, &input_times, idx)
+            .unwrap();
         assert_eq!(
             vec![
                 None,    // 950
@@ -1079,7 +1129,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: output_batch_size - 8
+                remaining_output_batch_size: output_batch_size - 8,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1092,7 +1143,7 @@ mod tests {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1350,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
         let input_times = TimestampNanosecondArray::from(vec![
             // 950
@@ -1104,11 +1155,7 @@ mod tests {
         ]);
         let series = input_times.len();
 
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
         assert_eq!(
             9,
             cursor_series_output_row_count(&params, &cursor, series, &input_times)
@@ -1131,7 +1178,8 @@ mod tests {
             Cursor {
                 next_input_offset: 2,
                 next_ts: Some(1200),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1154,7 +1202,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: 1
+                remaining_output_batch_size: 1,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1170,7 +1219,7 @@ mod tests {
             stride: 50,
             first_ts: Some(950),
             last_ts: 1350,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
         let input_times = TimestampNanosecondArray::from(vec![
             None,
@@ -1191,6 +1240,7 @@ mod tests {
             next_input_offset: 0,
             next_ts: params.first_ts,
             remaining_output_batch_size: output_batch_size,
+            aggr_col_state: null_aggr_col_state(),
         };
         assert_eq!(
             11,
@@ -1215,7 +1265,8 @@ mod tests {
             Cursor {
                 next_input_offset: 4,
                 next_ts: Some(1150),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1237,7 +1288,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: 1
+                remaining_output_batch_size: 1,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1254,7 +1306,7 @@ mod tests {
             stride: 50,
             first_ts: Some(1000),
             last_ts: 1100,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
         let input_times = TimestampNanosecondArray::from(vec![
             None,
@@ -1271,6 +1323,7 @@ mod tests {
             next_input_offset: 0,
             next_ts: params.first_ts,
             remaining_output_batch_size: output_batch_size,
+            aggr_col_state: null_aggr_col_state(),
         };
         assert_eq!(
             7,
@@ -1295,7 +1348,8 @@ mod tests {
             Cursor {
                 next_input_offset: 4,
                 next_ts: Some(1000),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1318,7 +1372,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: 1
+                remaining_output_batch_size: 1,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor,
         );
@@ -1337,7 +1392,7 @@ mod tests {
             stride: 50,
             first_ts: Some(1000),
             last_ts: 1100,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
         let input_times = TimestampNanosecondArray::from(vec![
             None,
@@ -1356,6 +1411,7 @@ mod tests {
             next_input_offset: 0,
             next_ts: params.first_ts,
             remaining_output_batch_size: output_batch_size,
+            aggr_col_state: null_aggr_col_state(),
         };
         assert_eq!(
             8,
@@ -1379,7 +1435,8 @@ mod tests {
             Cursor {
                 next_input_offset: 4,
                 next_ts: Some(1000),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1402,7 +1459,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor,
         );
@@ -1419,16 +1477,12 @@ mod tests {
             stride: 100,
             first_ts: Some(200),
             last_ts: 1000,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
         let input_times = TimestampNanosecondArray::from(vec![300, 500, 700, 800]);
         let series = input_times.len();
 
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
         assert_eq!(
             9,
             cursor_series_output_row_count(&params, &cursor, series, &input_times)
@@ -1451,7 +1505,8 @@ mod tests {
             Cursor {
                 next_input_offset: 1,
                 next_ts: Some(500),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1474,7 +1529,8 @@ mod tests {
             Cursor {
                 next_input_offset: 3,
                 next_ts: Some(800),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1497,7 +1553,8 @@ mod tests {
             Cursor {
                 next_input_offset: input_times.len(),
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1513,7 +1570,7 @@ mod tests {
             stride: 50,
             first_ts: Some(1000),
             last_ts: 1200,
-            fill_strategy: simple_fill_strategy(),
+            fill_strategy: null_fill_strategy(),
         };
         let input_times = TimestampNanosecondArray::from(vec![
             1000, // 1050
@@ -1526,11 +1583,7 @@ mod tests {
         let series0 = 3;
         let series1 = 7;
 
-        let mut cursor = Cursor {
-            next_input_offset: 0,
-            next_ts: params.first_ts,
-            remaining_output_batch_size: output_batch_size,
-        };
+        let mut cursor = Cursor::with_output_batch_size(&params, output_batch_size);
         assert_eq!(
             5,
             cursor_series_output_row_count(&params, &cursor, series0, &input_times)
@@ -1553,7 +1606,8 @@ mod tests {
             Cursor {
                 next_input_offset: 2,
                 next_ts: Some(1200),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1576,7 +1630,8 @@ mod tests {
             Cursor {
                 next_input_offset: 3,
                 next_ts: Some(params.last_ts + params.stride),
-                remaining_output_batch_size: 3
+                remaining_output_batch_size: 3,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1600,7 +1655,8 @@ mod tests {
             Cursor {
                 next_input_offset: 5,
                 next_ts: Some(1150),
-                remaining_output_batch_size: 0
+                remaining_output_batch_size: 0,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
@@ -1623,12 +1679,17 @@ mod tests {
             Cursor {
                 next_input_offset: 7,
                 next_ts: Some(1250),
-                remaining_output_batch_size: 2
+                remaining_output_batch_size: 2,
+                aggr_col_state: null_aggr_col_state(),
             },
             cursor
         );
 
         Ok(())
+    }
+
+    fn null_aggr_col_state() -> HashMap<usize, AggrColState> {
+        std::iter::once((1, AggrColState::Null)).collect()
     }
 
     fn cursor_series_output_row_count(
@@ -1641,8 +1702,12 @@ mod tests {
         cursor.count_series_rows(params, input_times, series_end)
     }
 
-    fn simple_fill_strategy() -> HashMap<usize, FillStrategy> {
+    fn null_fill_strategy() -> HashMap<usize, FillStrategy> {
         std::iter::once((1, FillStrategy::Null)).collect()
+    }
+
+    fn prev_fill_strategy(idx: usize) -> HashMap<usize, FillStrategy> {
+        std::iter::once((idx, FillStrategy::Prev)).collect()
     }
 
     struct Expected {
@@ -1670,7 +1735,7 @@ mod tests {
                 .build_group_take_vec(params, &[series_end], input_times)?;
         assert_eq!(expected.group_take, actual_group_take, "{desc} group take");
 
-        let actual_aggr_take =
+        let (_, actual_aggr_take) =
             cursor.build_aggr_take_vec_fill_null(params, &[series_end], input_times)?;
         assert_eq!(expected.aggr_take, actual_aggr_take, "{desc} aggr take");
 
