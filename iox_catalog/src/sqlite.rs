@@ -13,9 +13,9 @@ use crate::{
 use async_trait::async_trait;
 use data_types::{
     Column, ColumnId, ColumnSet, ColumnType, CompactionLevel, Namespace, NamespaceId, ParquetFile,
-    ParquetFileId, ParquetFileParams, Partition, PartitionId, PartitionKey, QueryPool, QueryPoolId,
-    SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table, TableId, Timestamp,
-    TopicId, TopicMetadata, TRANSITION_SHARD_ID, TRANSITION_SHARD_INDEX,
+    ParquetFileId, ParquetFileParams, Partition, PartitionHashId, PartitionId, PartitionKey,
+    QueryPool, QueryPoolId, SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table,
+    TableId, Timestamp, TopicId, TopicMetadata, TRANSITION_SHARD_ID, TRANSITION_SHARD_INDEX,
 };
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -972,6 +972,7 @@ WHERE id = $2;
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
 struct PartitionPod {
     id: PartitionId,
+    hash_id: Option<PartitionHashId>,
     shard_id: ShardId,
     table_id: TableId,
     partition_key: PartitionKey,
@@ -984,6 +985,7 @@ impl From<PartitionPod> for Partition {
     fn from(value: PartitionPod) -> Self {
         Self {
             id: value.id,
+            hash_id: value.hash_id,
             shard_id: value.shard_id,
             table_id: value.table_id,
             partition_key: value.partition_key,
@@ -1006,12 +1008,14 @@ impl PartitionRepo for SqliteTxn {
         // array rather than NULL which sqlx will throw `UnexpectedNullError` while is is doing
         // `ColumnDecode`
 
+        let hash_id = PartitionHashId::new(table_id, &key);
+
         let v = sqlx::query_as::<_, PartitionPod>(
             r#"
 INSERT INTO partition
-    ( partition_key, shard_id, table_id, sort_key)
+    (partition_key, shard_id, table_id, hash_id, sort_key)
 VALUES
-    ( $1, $2, $3, '[]')
+    ($1, $2, $3, $4, '[]')
 ON CONFLICT (table_id, partition_key)
 DO UPDATE SET partition_key = partition.partition_key
 RETURNING *;
@@ -1020,6 +1024,7 @@ RETURNING *;
         .bind(key) // $1
         .bind(shard_id) // $2
         .bind(table_id) // $3
+        .bind(&hash_id) // $4
         .fetch_one(self.inner.get_mut())
         .await
         .map_err(|e| {
@@ -1728,16 +1733,20 @@ mod tests {
             .expect("create table failed")
             .id;
 
-        let key = "bananas";
+        let key = PartitionKey::from("bananas");
         let shard_id = *shards.keys().next().expect("no shard");
+
+        let hash_id = PartitionHashId::new(table_id, &key);
 
         let a = sqlite
             .repositories()
             .await
             .partitions()
-            .create_or_get(key.into(), shard_id, table_id)
+            .create_or_get(key.clone(), shard_id, table_id)
             .await
             .expect("should create OK");
+
+        assert_eq!(a.hash_id.as_ref().unwrap(), &hash_id);
 
         // Call create_or_get for the same (key, table_id, shard_id)
         // triplet, setting the same shard ID to ensure the write is
@@ -1746,11 +1755,22 @@ mod tests {
             .repositories()
             .await
             .partitions()
-            .create_or_get(key.into(), shard_id, table_id)
+            .create_or_get(key.clone(), shard_id, table_id)
             .await
             .expect("idempotent write should succeed");
 
         assert_eq!(a, b);
+
+        // Check that the hash_id is saved in the database and is returned when queried.
+        let table_partitions = sqlite
+            .repositories()
+            .await
+            .partitions()
+            .list_by_table_id(table_id)
+            .await
+            .unwrap();
+        assert_eq!(table_partitions.len(), 1);
+        assert_eq!(table_partitions[0].hash_id.as_ref().unwrap(), &hash_id);
     }
 
     #[tokio::test]

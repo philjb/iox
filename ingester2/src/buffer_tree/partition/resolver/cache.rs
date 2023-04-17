@@ -297,15 +297,15 @@ mod tests {
         let inner = MockPartitionProvider::default();
 
         let stored_partition_key = PartitionKey::from(PARTITION_KEY);
-        let partition = Partition {
-            id: PARTITION_ID,
-            shard_id: TRANSITION_SHARD_ID,
-            table_id: TABLE_ID,
-            partition_key: stored_partition_key.clone(),
-            sort_key: vec!["dos".to_string(), "bananas".to_string()],
-            persisted_sequence_number: Default::default(),
-            new_file_at: Default::default(),
-        };
+        let partition = Partition::new(
+            PARTITION_ID,
+            TRANSITION_SHARD_ID,
+            TABLE_ID,
+            stored_partition_key.clone(),
+            vec!["dos".to_string(), "bananas".to_string()],
+            Default::default(),
+            Default::default(),
+        );
 
         let cache = new_cache(inner, [partition]);
 
@@ -365,15 +365,15 @@ mod tests {
             TRANSITION_SHARD_ID,
         ));
 
-        let partition = Partition {
-            id: PARTITION_ID,
-            shard_id: TRANSITION_SHARD_ID,
-            table_id: TABLE_ID,
-            partition_key: PARTITION_KEY.into(),
-            sort_key: Default::default(),
-            persisted_sequence_number: Default::default(),
-            new_file_at: Default::default(),
-        };
+        let partition = Partition::new(
+            PARTITION_ID,
+            TRANSITION_SHARD_ID,
+            TABLE_ID,
+            PARTITION_KEY.into(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        );
 
         let cache = new_cache(inner, [partition]);
         let got = cache
@@ -414,15 +414,15 @@ mod tests {
             TRANSITION_SHARD_ID,
         ));
 
-        let partition = Partition {
-            id: PARTITION_ID,
-            shard_id: TRANSITION_SHARD_ID,
-            table_id: TABLE_ID,
-            partition_key: PARTITION_KEY.into(),
-            sort_key: Default::default(),
-            persisted_sequence_number: Default::default(),
-            new_file_at: Default::default(),
-        };
+        let partition = Partition::new(
+            PARTITION_ID,
+            TRANSITION_SHARD_ID,
+            TABLE_ID,
+            PARTITION_KEY.into(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        );
 
         let cache = new_cache(inner, [partition]);
         let got = cache

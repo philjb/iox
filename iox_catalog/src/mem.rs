@@ -753,15 +753,15 @@ impl PartitionRepo for MemTxn {
             }) {
                 Some(p) => p,
                 None => {
-                    let p = Partition {
-                        id: PartitionId::new(stage.partitions.len() as i64 + 1),
+                    let p = Partition::new(
+                        PartitionId::new(stage.partitions.len() as i64 + 1),
                         shard_id,
                         table_id,
-                        partition_key: key,
-                        sort_key: vec![],
-                        persisted_sequence_number: None,
-                        new_file_at: None,
-                    };
+                        key,
+                        vec![],
+                        None,
+                        None,
+                    );
                     stage.partitions.push(p);
                     stage.partitions.last().unwrap()
                 }

@@ -153,15 +153,15 @@ impl PartitionBuilder {
     /// Create a builder to create a partition with `partition_id` `id`
     pub fn new(id: i64) -> Self {
         Self {
-            partition: Partition {
-                id: PartitionId::new(id),
-                shard_id: ShardId::new(0),
-                table_id: TableId::new(0),
-                partition_key: PartitionKey::from("key"),
-                sort_key: vec![],
-                persisted_sequence_number: None,
-                new_file_at: None,
-            },
+            partition: Partition::new(
+                PartitionId::new(id),
+                ShardId::new(0),
+                TableId::new(0),
+                PartitionKey::from("key"),
+                vec![],
+                None,
+                None,
+            ),
         }
     }
 

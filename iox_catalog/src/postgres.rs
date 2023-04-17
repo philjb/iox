@@ -13,9 +13,9 @@ use crate::{
 use async_trait::async_trait;
 use data_types::{
     Column, ColumnType, CompactionLevel, Namespace, NamespaceId, ParquetFile, ParquetFileId,
-    ParquetFileParams, Partition, PartitionId, PartitionKey, QueryPool, QueryPoolId,
-    SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table, TableId, Timestamp,
-    TopicId, TopicMetadata, TRANSITION_SHARD_ID, TRANSITION_SHARD_INDEX,
+    ParquetFileParams, Partition, PartitionHashId, PartitionId, PartitionKey, QueryPool,
+    QueryPoolId, SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table, TableId,
+    Timestamp, TopicId, TopicMetadata, TRANSITION_SHARD_ID, TRANSITION_SHARD_INDEX,
 };
 use iox_time::{SystemProvider, TimeProvider};
 use observability_deps::tracing::{debug, info, warn};
@@ -1198,12 +1198,14 @@ impl PartitionRepo for PostgresTxn {
         // array rather than NULL which sqlx will throw `UnexpectedNullError` while is is doing
         // `ColumnDecode`
 
+        let hash_id = PartitionHashId::new(table_id, &key);
+
         let v = sqlx::query_as::<_, Partition>(
             r#"
 INSERT INTO partition
-    ( partition_key, shard_id, table_id, sort_key)
+    (partition_key, shard_id, table_id, hash_id, sort_key)
 VALUES
-    ( $1, $2, $3, '{}')
+    ( $1, $2, $3, $4, '{}')
 ON CONFLICT ON CONSTRAINT partition_key_unique
 DO UPDATE SET partition_key = partition.partition_key
 RETURNING *;
@@ -1212,6 +1214,7 @@ RETURNING *;
         .bind(key) // $1
         .bind(shard_id) // $2
         .bind(table_id) // $3
+        .bind(&hash_id) // $4
         .fetch_one(&mut self.inner)
         .await
         .map_err(|e| {
@@ -2001,16 +2004,20 @@ mod tests {
             .expect("create table failed")
             .id;
 
-        let key = "bananas";
+        let key = PartitionKey::from("bananas");
         let shard_id = *shards.keys().next().expect("no shard");
+
+        let hash_id = PartitionHashId::new(table_id, &key);
 
         let a = postgres
             .repositories()
             .await
             .partitions()
-            .create_or_get(key.into(), shard_id, table_id)
+            .create_or_get(key.clone(), shard_id, table_id)
             .await
             .expect("should create OK");
+
+        assert_eq!(a.hash_id.as_ref().unwrap(), &hash_id);
 
         // Call create_or_get for the same (key, table_id, shard_id)
         // triplet, setting the same shard ID to ensure the write is
@@ -2019,11 +2026,22 @@ mod tests {
             .repositories()
             .await
             .partitions()
-            .create_or_get(key.into(), shard_id, table_id)
+            .create_or_get(key.clone(), shard_id, table_id)
             .await
             .expect("idempotent write should succeed");
 
         assert_eq!(a, b);
+
+        // Check that the hash_id is saved in the database and is returned when queried.
+        let table_partitions = postgres
+            .repositories()
+            .await
+            .partitions()
+            .list_by_table_id(table_id)
+            .await
+            .unwrap();
+        assert_eq!(table_partitions.len(), 1);
+        assert_eq!(table_partitions[0].hash_id.as_ref().unwrap(), &hash_id);
     }
 
     #[tokio::test]
