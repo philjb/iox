@@ -6,7 +6,7 @@ use arrow_flight::sql::{
     ActionClosePreparedStatementRequest, ActionCreatePreparedStatementRequest, Any,
     CommandGetCatalogs, CommandGetCrossReference, CommandGetDbSchemas, CommandGetExportedKeys,
     CommandGetImportedKeys, CommandGetPrimaryKeys, CommandGetSqlInfo, CommandGetTableTypes,
-    CommandGetTables, CommandPreparedStatementQuery, CommandStatementQuery,
+    CommandGetTables, CommandGetXdbcTypeInfo, CommandPreparedStatementQuery, CommandStatementQuery,
 };
 use bytes::Bytes;
 use prost::Message;
@@ -94,6 +94,9 @@ pub enum FlightSQLCommand {
     CommandGetPrimaryKeys(CommandGetPrimaryKeys),
     /// Get a list of the available tables
     CommandGetTables(CommandGetTables),
+    /// Get information about data types supported.
+    /// TODO chunchun: why [`CommandGetXdbcTypeInfo`] is not a pub mod?
+    CommandGetXdbcTypeInfo(CommandGetXdbcTypeInfo),
     /// Get a list of the available table tyypes
     CommandGetTableTypes(CommandGetTableTypes),
     /// Create a prepared statement
@@ -224,6 +227,13 @@ impl Display for FlightSQLCommand {
             Self::CommandGetTableTypes(CommandGetTableTypes {}) => {
                 write!(f, "CommandGetTableTypes")
             }
+            Self::CommandGetXdbcTypeInfo(CommandGetXdbcTypeInfo { data_type }) => {
+                write!(
+                    f,
+                    "CommandGetXdbcTypeInfo(data_type={})",
+                    data_type.as_ref().map(|dt| dt.as_ref()).unwrap_or(0),
+                )
+            }
             Self::ActionCreatePreparedStatementRequest(ActionCreatePreparedStatementRequest {
                 query,
             }) => {
@@ -269,6 +279,8 @@ impl FlightSQLCommand {
             Ok(Self::CommandGetTables(decode_cmd))
         } else if let Some(decoded_cmd) = Any::unpack::<CommandGetTableTypes>(&msg)? {
             Ok(Self::CommandGetTableTypes(decoded_cmd))
+        } else if let Some(decoded_cmd) = Any::unpack::<CommandGetXdbcTypeInfo>(&msg)? {
+            Ok(Self::CommandGetXdbcTypeInfo(decoded_cmd))
         } else if let Some(decoded_cmd) = Any::unpack::<ActionCreatePreparedStatementRequest>(&msg)?
         {
             Ok(Self::ActionCreatePreparedStatementRequest(decoded_cmd))
@@ -308,6 +320,7 @@ impl FlightSQLCommand {
             FlightSQLCommand::CommandGetPrimaryKeys(cmd) => Any::pack(&cmd),
             FlightSQLCommand::CommandGetTables(cmd) => Any::pack(&cmd),
             FlightSQLCommand::CommandGetTableTypes(cmd) => Any::pack(&cmd),
+            FlightSQLCommand::CommandGetXdbcTypeInfo(cmd) => Any::pack(&cmd),
             FlightSQLCommand::ActionCreatePreparedStatementRequest(cmd) => Any::pack(&cmd),
             FlightSQLCommand::ActionClosePreparedStatementRequest(handle) => {
                 let prepared_statement_handle = handle.encode();

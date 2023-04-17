@@ -28,10 +28,22 @@ use arrow_flight::{
     decode::FlightRecordBatchStream,
     error::{FlightError, Result},
     sql::{
-        ActionCreatePreparedStatementRequest, ActionCreatePreparedStatementResult, Any,
-        CommandGetCatalogs, CommandGetCrossReference, CommandGetDbSchemas, CommandGetExportedKeys,
-        CommandGetImportedKeys, CommandGetPrimaryKeys, CommandGetSqlInfo, CommandGetTableTypes,
-        CommandGetTables, CommandPreparedStatementQuery, CommandStatementQuery, ProstMessageExt,
+        ActionCreatePreparedStatementRequest,
+        ActionCreatePreparedStatementResult,
+        Any,
+        CommandGetCatalogs,
+        CommandGetCrossReference,
+        CommandGetDbSchemas,
+        CommandGetExportedKeys,
+        CommandGetImportedKeys,
+        CommandGetPrimaryKeys,
+        CommandGetSqlInfo,
+        CommandGetTableTypes,
+        CommandGetTables,
+        CommandGetXdbcTypeInfo, // TODO chunchun
+        CommandPreparedStatementQuery,
+        CommandStatementQuery,
+        ProstMessageExt,
     },
     Action, FlightClient, FlightDescriptor, FlightInfo, IpcMessage, Ticket,
 };
@@ -358,6 +370,26 @@ impl FlightSqlClient {
     /// [`CommandGetTableTypes`]: https://github.com/apache/arrow/blob/44edc27e549d82db930421b0d4c76098941afd71/format/FlightSql.proto#L1243-L1259
     pub async fn get_table_types(&mut self) -> Result<FlightRecordBatchStream> {
         let msg = CommandGetTableTypes {};
+        self.do_get_with_cmd(msg.as_any()).await
+    }
+
+    /// List information about data type supported on this server
+    /// using a [`CommandGetXdbcTypeInfo`] message.
+    ///
+    /// # Parameters
+    ///
+    /// Definition from <https://github.com/apache/arrow/blob/8c9143436a73145cbe03648ed694c490e5d9e75d/format/FlightSql.proto#L1058-L1123>
+    ///
+    /// data_type: Specifies the data type to search for the info.
+    ///
+    /// This implementation does not support alternate endpoints
+    pub async fn get_xdbc_type_info(
+        &mut self,
+        data_type: Option<impl Into<i32> + Send>,
+    ) -> Result<FlightRecordBatchStream> {
+        let msg = CommandGetXdbcTypeInfo {
+            data_type: data_type.map(|dt| dt.into()),
+        };
         self.do_get_with_cmd(msg.as_any()).await
     }
 
