@@ -344,6 +344,8 @@ async fn run_plans(
             .await?,
         )
     }
+    .buffer_unordered(4)
+    .collect::<()>();
 
     Ok(created_file_params)
 }
