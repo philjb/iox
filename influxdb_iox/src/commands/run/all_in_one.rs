@@ -3,7 +3,6 @@
 use crate::process_info::setup_metric_registry;
 
 use super::main;
-use authz::Authorizer;
 use clap_blocks::{
     authz::AuthzConfig,
     catalog_dsn::CatalogDsnConfig,
@@ -515,6 +514,7 @@ impl Config {
         };
 
         let querier_config = QuerierConfig {
+            authz_address: authz_config.authz_addr,
             num_query_threads: None, // will be ignored
             ingester_addresses,
             ram_pool_metadata_bytes: querier_ram_pool_metadata_bytes,
@@ -523,6 +523,7 @@ impl Config {
             exec_mem_pool_bytes,
             ingester_circuit_breaker_threshold: u64::MAX, // never for all-in-one-mode
             datafusion_config: Default::default(),
+            single_tenant_deployment,
         };
 
         SpecializedConfig {
@@ -537,7 +538,6 @@ impl Config {
             router_config,
             compactor_config,
             querier_config,
-            authz_config,
         }
     }
 }
@@ -565,7 +565,6 @@ struct SpecializedConfig {
     router_config: Router2Config,
     compactor_config: Compactor2Config,
     querier_config: QuerierConfig,
-    authz_config: AuthzConfig,
 }
 
 pub async fn command(config: Config) -> Result<()> {
@@ -579,7 +578,6 @@ pub async fn command(config: Config) -> Result<()> {
         router_config,
         compactor_config,
         querier_config,
-        authz_config,
     } = config.specialize();
 
     let metrics = setup_metric_registry();
@@ -606,10 +604,6 @@ pub async fn command(config: Config) -> Result<()> {
             .map_err(Error::ObjectStoreParsing)?;
 
     let time_provider: Arc<dyn TimeProvider> = Arc::new(SystemProvider::new());
-
-    let authz = authz_config.authorizer()?;
-    // Verify the connection to the authorizer, if configured.
-    authz.probe().await?;
 
     // create common state from the router and use it below
     let common_state = CommonServerState::from_config(router_run_config.clone())?;
@@ -684,7 +678,6 @@ pub async fn command(config: Config) -> Result<()> {
         exec,
         time_provider,
         querier_config,
-        authz: authz.as_ref().map(Arc::clone),
     })
     .await?;
 
