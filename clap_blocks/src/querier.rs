@@ -1,13 +1,16 @@
 //! Querier-related configs.
 
-use crate::ingester_address::IngesterAddress;
+use crate::{
+    ingester_address::IngesterAddress,
+    single_tenant::{CONFIG_AUTHZ_ENV_NAME, CONFIG_CST_ENV_NAME},
+};
 use std::{collections::HashMap, num::NonZeroUsize};
 
 /// CLI config for querier configuration
 #[derive(Debug, Clone, PartialEq, Eq, clap::Parser)]
 pub struct QuerierConfig {
     /// Addr for connection to authz
-    #[clap(long = "querier-authz-addr", env = "INFLUXDB_IOX_AUTHZ_ADDR")]
+    #[clap(long = "querier-authz-addr", env = CONFIG_AUTHZ_ENV_NAME)]
     pub authz_address: Option<String>,
 
     /// Differential handling based upon deployment to CST vs MT.
@@ -16,7 +19,7 @@ pub struct QuerierConfig {
     /// differences in namespace handling, etc.
     #[clap(
         long = "querier-single-tenancy",
-        env = "INFLUXDB_IOX_SINGLE_TENANCY",
+        env = CONFIG_CST_ENV_NAME,
         default_value = "false",
         requires_if("true", "authz_address")
     )]

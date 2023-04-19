@@ -4,8 +4,8 @@ use crate::process_info::setup_metric_registry;
 
 use super::main;
 use clap_blocks::{
-    authz::AuthzConfig, catalog_dsn::CatalogDsnConfig, object_store::make_object_store,
-    querier::QuerierConfig, run_config::RunConfig,
+    catalog_dsn::CatalogDsnConfig, object_store::make_object_store, querier::QuerierConfig,
+    run_config::RunConfig,
 };
 use iox_query::exec::Executor;
 use iox_time::{SystemProvider, TimeProvider};
@@ -40,9 +40,6 @@ pub enum Error {
     #[error("Querier error: {0}")]
     Querier(#[from] ioxd_querier::Error),
 
-    #[error("Authz configuration error: {0}")]
-    AuthzConfig(#[from] clap_blocks::authz::Error),
-
     #[error("Authz service error: {0}")]
     AuthzService(#[from] authz::Error),
 }
@@ -63,10 +60,6 @@ Configuration is loaded from the following sources (highest precedence first):
         - pre-configured default values"
 )]
 pub struct Config {
-    /// Authorizer options.
-    #[clap(flatten)]
-    pub(crate) authz_config: AuthzConfig,
-
     #[clap(flatten)]
     pub(crate) run_config: RunConfig,
 
