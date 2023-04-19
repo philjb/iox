@@ -472,6 +472,7 @@ impl Config {
         };
 
         let router_config = Router2Config {
+            authz_address: authz_config.authz_addr.clone(),
             query_pool_name: QUERY_POOL_NAME.to_string(),
             http_request_limit: 1_000,
             ingester_addresses: ingester_addresses.clone(),
@@ -636,7 +637,6 @@ pub async fn command(config: Config) -> Result<()> {
         Arc::clone(&metrics),
         Arc::clone(&catalog),
         Arc::clone(&object_store),
-        authz.as_ref().map(Arc::clone),
         &router_config,
     )
     .await?;

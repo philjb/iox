@@ -10,14 +10,19 @@ use std::{
 #[derive(Debug, Clone, clap::Parser)]
 #[allow(missing_copy_implementations)]
 pub struct Router2Config {
+    /// Addr for connection to authz
+    #[clap(long = "router-authz-addr", env = "INFLUXDB_IOX_AUTHZ_ADDR")]
+    pub authz_address: Option<String>,
+
     /// Differential handling based upon deployment to CST vs MT.
     ///
     /// At minimum, differs in supports of v1 endpoint. But also includes
     /// differences in namespace handling, etc.
     #[clap(
-        long = "single-tenancy",
+        long = "router-single-tenancy",
         env = "INFLUXDB_IOX_SINGLE_TENANCY",
-        default_value = "false"
+        default_value = "false",
+        requires_if("true", "authz_address")
     )]
     pub single_tenant_deployment: bool,
 

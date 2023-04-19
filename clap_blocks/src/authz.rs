@@ -17,8 +17,9 @@ pub enum Error {
 /// Configuration for optional request authorization.
 #[derive(Clone, Debug, Default, clap::Parser)]
 pub struct AuthzConfig {
+    /// Addr for connection to authz
     #[clap(long = "authz-addr", env = "INFLUXDB_IOX_AUTHZ_ADDR")]
-    pub(crate) authz_addr: Option<String>,
+    pub authz_addr: Option<String>,
 }
 
 impl AuthzConfig {
