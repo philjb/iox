@@ -209,7 +209,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_trait::async_trait;
-    use data_types::{NamespaceId, PartitionId, TableId};
+    use data_types::{NamespaceId, ObjectStorePathPartitionId, TableId};
     use futures::{task::Context, Future, FutureExt};
     use metric::{assert_counter, U64Gauge};
     use parking_lot::Mutex;
@@ -264,7 +264,7 @@ mod tests {
         Arc::new(CompletedPersist::new(
             NamespaceId::new(1),
             TableId::new(2),
-            PartitionId::new(3),
+            ObjectStorePathPartitionId::new(3),
             new_set(vals),
         ))
     }

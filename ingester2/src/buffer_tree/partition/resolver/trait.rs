@@ -60,7 +60,7 @@ where
 mod tests {
     use std::{sync::Arc, time::Duration};
 
-    use data_types::{PartitionId, ShardId};
+    use data_types::{ObjectStorePathPartitionId, ShardId};
 
     use super::*;
     use crate::buffer_tree::partition::{resolver::mock::MockPartitionProvider, SortKeyState};
@@ -78,7 +78,7 @@ mod tests {
         let table_name = Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
             TableName::from("platanos")
         }));
-        let partition = PartitionId::new(4242);
+        let partition = ObjectStorePathPartitionId::new(4242);
         let data = PartitionData::new(
             partition,
             "bananas".into(),

@@ -21,8 +21,8 @@ use arrow::{
 };
 use async_trait::async_trait;
 use data_types::{
-    ChunkId, ChunkOrder, ColumnSummary, DeletePredicate, InfluxDbType, PartitionId, StatValues,
-    Statistics, TableSummary,
+    ChunkId, ChunkOrder, ColumnSummary, DeletePredicate, InfluxDbType, ObjectStorePathPartitionId,
+    StatValues, Statistics, TableSummary,
 };
 use datafusion::datasource::{object_store::ObjectStoreUrl, TableProvider, TableType};
 use datafusion::error::DataFusionError;
@@ -317,7 +317,7 @@ pub struct TestChunk {
 
     id: ChunkId,
 
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
 
     /// Set the flag if this chunk might contain duplicates
     may_contain_pk_duplicates: bool,
@@ -428,7 +428,7 @@ impl TestChunk {
             order: ChunkOrder::MIN,
             sort_key: None,
             partition_sort_key: None,
-            partition_id: PartitionId::new(0),
+            partition_id: ObjectStorePathPartitionId::new(0),
             quiet: false,
         }
     }
@@ -500,7 +500,7 @@ impl TestChunk {
     }
 
     pub fn with_partition_id(mut self, id: i64) -> Self {
-        self.partition_id = PartitionId::new(id);
+        self.partition_id = ObjectStorePathPartitionId::new(id);
         self
     }
 
@@ -1256,7 +1256,7 @@ impl QueryChunkMeta for TestChunk {
         self.partition_sort_key.as_ref()
     }
 
-    fn partition_id(&self) -> PartitionId {
+    fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 

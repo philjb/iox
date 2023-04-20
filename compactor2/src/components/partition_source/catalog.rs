@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
 use backoff::{Backoff, BackoffConfig};
-use data_types::{Partition, PartitionId};
+use data_types::{ObjectStorePathPartitionId, Partition};
 use iox_catalog::interface::Catalog;
 
 use super::PartitionSource;
@@ -30,7 +30,7 @@ impl Display for CatalogPartitionSource {
 
 #[async_trait]
 impl PartitionSource for CatalogPartitionSource {
-    async fn fetch_by_id(&self, partition_id: PartitionId) -> Option<Partition> {
+    async fn fetch_by_id(&self, partition_id: ObjectStorePathPartitionId) -> Option<Partition> {
         Backoff::new(&self.backoff_config)
             .retry_all_errors("partition_by_id", || async {
                 self.catalog

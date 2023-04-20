@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
 use backoff::{Backoff, BackoffConfig};
-use data_types::{ParquetFile, PartitionId};
+use data_types::{ObjectStorePathPartitionId, ParquetFile};
 use iox_catalog::interface::Catalog;
 
 use super::PartitionFilesSource;
@@ -30,7 +30,7 @@ impl Display for CatalogPartitionFilesSource {
 
 #[async_trait]
 impl PartitionFilesSource for CatalogPartitionFilesSource {
-    async fn fetch(&self, partition: PartitionId) -> Vec<ParquetFile> {
+    async fn fetch(&self, partition: ObjectStorePathPartitionId) -> Vec<ParquetFile> {
         Backoff::new(&self.backoff_config)
             .retry_all_errors("parquet_files_of_given_partition", || async {
                 self.catalog

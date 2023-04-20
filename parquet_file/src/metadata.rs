@@ -90,8 +90,8 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use bytes::Bytes;
 use data_types::{
     ColumnId, ColumnSet, ColumnSummary, CompactionLevel, InfluxDbType, NamespaceId,
-    ParquetFileParams, PartitionId, PartitionKey, SequenceNumber, ShardId, StatValues, Statistics,
-    TableId, Timestamp,
+    ObjectStorePathPartitionId, ParquetFileParams, PartitionKey, SequenceNumber, ShardId,
+    StatValues, Statistics, TableId, Timestamp,
 };
 use generated_types::influxdata::iox::ingester::v1 as proto;
 use iox_time::Time;
@@ -272,7 +272,7 @@ pub struct IoxMetadata {
     pub table_name: Arc<str>,
 
     /// partition id of the data
-    pub partition_id: PartitionId,
+    pub partition_id: ObjectStorePathPartitionId,
 
     /// partition key of the data
     pub partition_key: PartitionKey,
@@ -395,7 +395,7 @@ impl IoxMetadata {
             shard_id: ShardId::new(proto_msg.shard_id),
             table_id: TableId::new(proto_msg.table_id),
             table_name,
-            partition_id: PartitionId::new(proto_msg.partition_id),
+            partition_id: ObjectStorePathPartitionId::new(proto_msg.partition_id),
             partition_key,
             max_sequence_number: SequenceNumber::new(proto_msg.max_sequence_number),
             sort_key,
@@ -421,7 +421,7 @@ impl IoxMetadata {
             shard_id: ShardId::new(1),
             table_id: TableId::new(1),
             table_name: table_name.into(),
-            partition_id: PartitionId::new(1),
+            partition_id: ObjectStorePathPartitionId::new(1),
             partition_key: "unknown".into(),
             max_sequence_number: SequenceNumber::new(1),
             compaction_level: CompactionLevel::Initial,
@@ -452,7 +452,7 @@ impl IoxMetadata {
     /// [`RecordBatch`]: arrow::record_batch::RecordBatch
     pub fn to_parquet_file<F>(
         &self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         file_size_bytes: usize,
         metadata: &IoxParquetMetaData,
         column_id_map: F,
@@ -1023,7 +1023,7 @@ mod tests {
             shard_id: ShardId::new(1),
             table_id: TableId::new(3),
             table_name: Arc::from("weather"),
-            partition_id: PartitionId::new(4),
+            partition_id: ObjectStorePathPartitionId::new(4),
             partition_key: PartitionKey::from("part"),
             max_sequence_number: SequenceNumber::new(6),
             compaction_level: CompactionLevel::Initial,
@@ -1048,7 +1048,7 @@ mod tests {
             shard_id: ShardId::new(2),
             table_id: TableId::new(3),
             table_name: "platanos".into(),
-            partition_id: PartitionId::new(4),
+            partition_id: ObjectStorePathPartitionId::new(4),
             partition_key: "potato".into(),
             max_sequence_number: SequenceNumber::new(11),
             compaction_level: CompactionLevel::FileNonOverlapped,

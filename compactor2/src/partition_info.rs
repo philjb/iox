@@ -2,14 +2,14 @@
 
 use std::sync::Arc;
 
-use data_types::{NamespaceId, PartitionId, PartitionKey, Table, TableSchema};
+use data_types::{NamespaceId, ObjectStorePathPartitionId, PartitionKey, Table, TableSchema};
 use schema::sort::SortKey;
 
 /// Information about the Partition being compacted
 #[derive(Debug, PartialEq, Eq)]
 pub struct PartitionInfo {
     /// the partition
-    pub partition_id: PartitionId,
+    pub partition_id: ObjectStorePathPartitionId,
 
     /// Namespace ID
     pub namespace_id: NamespaceId,

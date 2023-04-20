@@ -234,7 +234,7 @@ mod tests {
     use std::{sync::Arc, time::Duration};
 
     use assert_matches::assert_matches;
-    use data_types::{PartitionId, PartitionKey};
+    use data_types::{ObjectStorePathPartitionId, PartitionKey};
     use datafusion::{assert_batches_eq, assert_batches_sorted_eq};
     use futures::{StreamExt, TryStreamExt};
     use metric::{Attributes, Metric};
@@ -268,7 +268,7 @@ mod tests {
         // table ID.
         let partition_provider = Arc::new(MockPartitionProvider::default().with_partition(
             PartitionData::new(
-                PartitionId::new(0),
+                ObjectStorePathPartitionId::new(0),
                 PartitionKey::from("banana-split"),
                 NAMESPACE_ID,
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -395,7 +395,7 @@ mod tests {
     test_write_query!(
         read_writes,
         partitions = [PartitionData::new(
-            PartitionId::new(0),
+            ObjectStorePathPartitionId::new(0),
             PartitionKey::from("p1"),
             NAMESPACE_ID,
             Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -431,7 +431,7 @@ mod tests {
         multiple_partitions,
         partitions = [
             PartitionData::new(
-                PartitionId::new(0),
+                ObjectStorePathPartitionId::new(0),
                 PartitionKey::from("p1"),
                 NAMESPACE_ID,
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -445,7 +445,7 @@ mod tests {
                 TRANSITION_SHARD_ID,
             ),
             PartitionData::new(
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 PartitionKey::from("p2"),
                 NAMESPACE_ID,
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -493,7 +493,7 @@ mod tests {
         filter_multiple_namespaces,
         partitions = [
             PartitionData::new(
-                PartitionId::new(0),
+                ObjectStorePathPartitionId::new(0),
                 PartitionKey::from("p1"),
                 NAMESPACE_ID,
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -507,7 +507,7 @@ mod tests {
                 TRANSITION_SHARD_ID,
             ),
             PartitionData::new(
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 PartitionKey::from("p2"),
                 NamespaceId::new(4321), // A different namespace ID.
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -554,7 +554,7 @@ mod tests {
         filter_multiple_tabls,
         partitions = [
             PartitionData::new(
-                PartitionId::new(0),
+                ObjectStorePathPartitionId::new(0),
                 PartitionKey::from("p1"),
                 NAMESPACE_ID,
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -568,7 +568,7 @@ mod tests {
                 TRANSITION_SHARD_ID,
             ),
             PartitionData::new(
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 PartitionKey::from("p2"),
                 NAMESPACE_ID,
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -616,7 +616,7 @@ mod tests {
     test_write_query!(
         duplicate_writes,
         partitions = [PartitionData::new(
-            PartitionId::new(0),
+            ObjectStorePathPartitionId::new(0),
             PartitionKey::from("p1"),
             NAMESPACE_ID,
             Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -666,7 +666,7 @@ mod tests {
         let partition_provider = Arc::new(
             MockPartitionProvider::default()
                 .with_partition(PartitionData::new(
-                    PartitionId::new(0),
+                    ObjectStorePathPartitionId::new(0),
                     PartitionKey::from("p1"),
                     NAMESPACE_ID,
                     Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -680,7 +680,7 @@ mod tests {
                     TRANSITION_SHARD_ID,
                 ))
                 .with_partition(PartitionData::new(
-                    PartitionId::new(0),
+                    ObjectStorePathPartitionId::new(0),
                     PartitionKey::from("p2"),
                     NAMESPACE_ID,
                     Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -763,7 +763,7 @@ mod tests {
         let partition_provider = Arc::new(
             MockPartitionProvider::default()
                 .with_partition(PartitionData::new(
-                    PartitionId::new(0),
+                    ObjectStorePathPartitionId::new(0),
                     PartitionKey::from("p1"),
                     NAMESPACE_ID,
                     Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -777,7 +777,7 @@ mod tests {
                     TRANSITION_SHARD_ID,
                 ))
                 .with_partition(PartitionData::new(
-                    PartitionId::new(1),
+                    ObjectStorePathPartitionId::new(1),
                     PartitionKey::from("p2"),
                     NAMESPACE_ID,
                     Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -791,7 +791,7 @@ mod tests {
                     TRANSITION_SHARD_ID,
                 ))
                 .with_partition(PartitionData::new(
-                    PartitionId::new(2),
+                    ObjectStorePathPartitionId::new(2),
                     PartitionKey::from("p3"),
                     NAMESPACE_ID,
                     Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -876,7 +876,7 @@ mod tests {
     async fn test_not_found() {
         let partition_provider = Arc::new(MockPartitionProvider::default().with_partition(
             PartitionData::new(
-                PartitionId::new(0),
+                ObjectStorePathPartitionId::new(0),
                 PartitionKey::from("p1"),
                 NAMESPACE_ID,
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -961,7 +961,7 @@ mod tests {
         let partition_provider = Arc::new(
             MockPartitionProvider::default()
                 .with_partition(PartitionData::new(
-                    PartitionId::new(0),
+                    ObjectStorePathPartitionId::new(0),
                     PartitionKey::from("p1"),
                     NAMESPACE_ID,
                     Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -975,7 +975,7 @@ mod tests {
                     TRANSITION_SHARD_ID,
                 ))
                 .with_partition(PartitionData::new(
-                    PartitionId::new(1),
+                    ObjectStorePathPartitionId::new(1),
                     PartitionKey::from("p2"),
                     NAMESPACE_ID,
                     Arc::new(DeferredLoad::new(Duration::from_secs(1), async {

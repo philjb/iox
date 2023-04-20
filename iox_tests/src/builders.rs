@@ -1,6 +1,7 @@
 use data_types::{
-    ColumnSet, CompactionLevel, NamespaceId, ParquetFile, ParquetFileId, Partition, PartitionId,
-    PartitionKey, SequenceNumber, ShardId, SkippedCompaction, Table, TableId, Timestamp,
+    ColumnSet, CompactionLevel, NamespaceId, ObjectStorePathPartitionId, ParquetFile,
+    ParquetFileId, Partition, PartitionKey, SequenceNumber, ShardId, SkippedCompaction, Table,
+    TableId, Timestamp,
 };
 use uuid::Uuid;
 
@@ -20,7 +21,7 @@ impl ParquetFileBuilder {
                 shard_id: ShardId::new(0),
                 namespace_id: NamespaceId::new(0),
                 table_id: TableId::new(0),
-                partition_id: PartitionId::new(0),
+                partition_id: ObjectStorePathPartitionId::new(0),
                 object_store_id: Uuid::from_u128(id.try_into().expect("invalid id")),
                 max_sequence_number: SequenceNumber::new(0),
                 min_time: Timestamp::new(0),
@@ -40,7 +41,7 @@ impl ParquetFileBuilder {
     pub fn with_partition(self, id: i64) -> Self {
         Self {
             file: ParquetFile {
-                partition_id: PartitionId::new(id),
+                partition_id: ObjectStorePathPartitionId::new(id),
                 ..self.file
             },
         }
@@ -154,7 +155,7 @@ impl PartitionBuilder {
     pub fn new(id: i64) -> Self {
         Self {
             partition: Partition::new(
-                PartitionId::new(id),
+                ObjectStorePathPartitionId::new(id),
                 ShardId::new(0),
                 TableId::new(0),
                 PartitionKey::from("key"),
@@ -189,7 +190,7 @@ impl SkippedCompactionBuilder {
     pub fn new(id: i64) -> Self {
         Self {
             skipped_compaction: SkippedCompaction {
-                partition_id: PartitionId::new(id),
+                partition_id: ObjectStorePathPartitionId::new(id),
                 reason: "test skipped compaction".to_string(),
                 skipped_at: Timestamp::new(0),
                 num_files: 0,

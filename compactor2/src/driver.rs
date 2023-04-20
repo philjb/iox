@@ -1,6 +1,6 @@
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
-use data_types::{CompactionLevel, ParquetFile, ParquetFileParams, PartitionId};
+use data_types::{CompactionLevel, ObjectStorePathPartitionId, ParquetFile, ParquetFileParams};
 use futures::StreamExt;
 use observability_deps::tracing::info;
 use parquet_file::ParquetFilePath;
@@ -47,7 +47,7 @@ pub async fn compact(
 }
 
 async fn compact_partition(
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     partition_timeout: Duration,
     job_semaphore: Arc<InstrumentedAsyncSemaphore>,
     components: Arc<Components>,
@@ -183,7 +183,7 @@ async fn compact_partition(
 ///   . If there are no L0s files in the partition, the first round can just compact L1s and L2s to L2s
 ///   . Round 2 happens or not depends on the stop condition
 async fn try_compact_partition(
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     job_semaphore: Arc<InstrumentedAsyncSemaphore>,
     components: Arc<Components>,
     scratchpad_ctx: &mut dyn Scratchpad,
@@ -431,7 +431,7 @@ async fn upload_files_to_object_store(
 
 async fn fetch_and_save_parquet_file_state(
     components: &Components,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
 ) -> SavedParquetFileState {
     let catalog_files = components.partition_files_source.fetch(partition_id).await;
     SavedParquetFileState::from(&catalog_files)
@@ -442,7 +442,7 @@ async fn fetch_and_save_parquet_file_state(
 /// Return created and upgraded files
 async fn update_catalog(
     components: Arc<Components>,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     saved_parquet_file_state: SavedParquetFileState,
     files_to_delete: Vec<ParquetFile>,
     files_to_upgrade: Vec<ParquetFile>,

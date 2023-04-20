@@ -422,7 +422,7 @@ mod tests {
     use crate::{AggregateTSMField, AggregateTSMTag};
     use assert_matches::assert_matches;
     use client_util::connection::Builder;
-    use data_types::{PartitionId, TableId};
+    use data_types::{ObjectStorePathPartitionId, TableId};
     use iox_catalog::mem::MemCatalog;
     use parking_lot::RwLock;
     use std::{collections::HashSet, net::SocketAddr};
@@ -1229,7 +1229,7 @@ mod tests {
             latest_time: DateTime::parse_from_rfc3339("2022-07-07T06:00:00+00:00").unwrap(),
         };
         let partition = Partition::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             ShardId::new(1),
             TableId::new(1),
             PartitionKey::from("2022-06-21"),
@@ -1277,7 +1277,7 @@ mod tests {
             latest_time: DateTime::parse_from_rfc3339("2022-07-07T06:00:00+00:00").unwrap(),
         };
         let partition = Partition::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             ShardId::new(1),
             TableId::new(1),
             PartitionKey::from("2022-06-21"),
@@ -1326,7 +1326,7 @@ mod tests {
             latest_time: DateTime::parse_from_rfc3339("2022-07-07T06:00:00+00:00").unwrap(),
         };
         let partition = Partition::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             ShardId::new(1),
             TableId::new(1),
             PartitionKey::from("2022-06-21"),
@@ -1376,7 +1376,7 @@ mod tests {
             latest_time: DateTime::parse_from_rfc3339("2022-07-07T06:00:00+00:00").unwrap(),
         };
         let partition = Partition::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             ShardId::new(1),
             TableId::new(1),
             PartitionKey::from("2022-06-21"),

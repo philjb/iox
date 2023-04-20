@@ -231,7 +231,7 @@ where
 mod tests {
     use std::{sync::Arc, time::Duration};
 
-    use data_types::{PartitionId, PartitionKey, ShardId};
+    use data_types::{ObjectStorePathPartitionId, PartitionKey, ShardId};
     use metric::{Attributes, Metric};
 
     use super::*;
@@ -260,7 +260,7 @@ mod tests {
         // table ID.
         let partition_provider = Arc::new(MockPartitionProvider::default().with_partition(
             PartitionData::new(
-                PartitionId::new(0),
+                ObjectStorePathPartitionId::new(0),
                 PartitionKey::from("banana-split"),
                 NAMESPACE_ID,
                 Arc::new(DeferredLoad::new(Duration::from_secs(1), async {

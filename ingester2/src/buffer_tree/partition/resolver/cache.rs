@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use backoff::BackoffConfig;
 use data_types::{
-    NamespaceId, Partition, PartitionId, PartitionKey, SequenceNumber, ShardId, TableId,
+    NamespaceId, Partition, ObjectStorePathPartitionId, PartitionKey, SequenceNumber, ShardId, TableId,
 };
 use iox_catalog::interface::Catalog;
 use observability_deps::tracing::debug;
@@ -69,7 +69,7 @@ pub(crate) struct PartitionCache<T> {
     /// It's also likely a smaller N (more tables than partition keys) making it
     /// a faster search for cache misses.
     #[allow(clippy::type_complexity)]
-    entries: Mutex<HashMap<PartitionKey, HashMap<TableId, PartitionId>>>,
+    entries: Mutex<HashMap<PartitionKey, HashMap<TableId, ObjectStorePathPartitionId>>>,
 
     /// Data needed to construct the [`SortKeyResolver`] for cached entries.
     catalog: Arc<dyn Catalog>,
@@ -98,7 +98,7 @@ impl<T> PartitionCache<T> {
     where
         P: IntoIterator<Item = Partition>,
     {
-        let mut entries = HashMap::<PartitionKey, HashMap<TableId, PartitionId>>::new();
+        let mut entries = HashMap::<PartitionKey, HashMap<TableId, ObjectStorePathPartitionId>>::new();
         for p in partitions.into_iter() {
             entries
                 .entry(p.partition_key)
@@ -127,7 +127,7 @@ impl<T> PartitionCache<T> {
         &self,
         table_id: TableId,
         partition_key: &PartitionKey,
-    ) -> Option<(PartitionKey, PartitionId)> {
+    ) -> Option<(PartitionKey, ObjectStorePathPartitionId)> {
         let mut entries = self.entries.lock();
 
         // Look up the partition key provided by the caller.
@@ -228,7 +228,7 @@ mod tests {
     use crate::buffer_tree::partition::resolver::mock::MockPartitionProvider;
 
     const PARTITION_KEY: &str = "bananas";
-    const PARTITION_ID: PartitionId = PartitionId::new(42);
+    const PARTITION_ID: ObjectStorePathPartitionId = ObjectStorePathPartitionId::new(42);
     const NAMESPACE_ID: NamespaceId = NamespaceId::new(2);
     const NAMESPACE_NAME: &str = "ns-bananas";
     const TABLE_ID: TableId = TableId::new(3);
@@ -349,7 +349,7 @@ mod tests {
     #[tokio::test]
     async fn test_miss_partition_key() {
         let other_key = PartitionKey::from("test");
-        let other_key_id = PartitionId::new(99);
+        let other_key_id = ObjectStorePathPartitionId::new(99);
         let inner = MockPartitionProvider::default().with_partition(PartitionData::new(
             other_key_id,
             other_key.clone(),

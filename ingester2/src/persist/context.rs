@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use data_types::{NamespaceId, PartitionId, PartitionKey, ShardId, TableId};
+use data_types::{NamespaceId, ObjectStorePathPartitionId, PartitionKey, ShardId, TableId};
 use observability_deps::tracing::*;
 use parking_lot::Mutex;
 use schema::sort::SortKey;
@@ -66,7 +66,7 @@ impl PersistRequest {
     }
 
     /// Return the partition ID of the persisting data.
-    pub(super) fn partition_id(&self) -> PartitionId {
+    pub(super) fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.data.partition_id()
     }
 }
@@ -85,7 +85,7 @@ pub(super) struct Context {
     /// IDs loaded from the partition at construction time.
     namespace_id: NamespaceId,
     table_id: TableId,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
 
     transition_shard_id: ShardId,
 
@@ -291,7 +291,7 @@ impl Context {
         self.table_id
     }
 
-    pub(super) fn partition_id(&self) -> PartitionId {
+    pub(super) fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 

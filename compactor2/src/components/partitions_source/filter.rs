@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 
 use crate::components::id_only_partition_filter::IdOnlyPartitionFilter;
 
@@ -43,7 +43,7 @@ where
     T: PartitionsSource,
     F: IdOnlyPartitionFilter,
 {
-    async fn fetch(&self) -> Vec<PartitionId> {
+    async fn fetch(&self) -> Vec<ObjectStorePathPartitionId> {
         self.inner
             .fetch()
             .await

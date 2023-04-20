@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Display};
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 
 use crate::error::{DynError, ErrorKind, ErrorKindExt};
 
@@ -41,7 +41,7 @@ impl<T> PartitionDoneSink for ErrorKindPartitionDoneSinkWrapper<T>
 where
     T: PartitionDoneSink,
 {
-    async fn record(&self, partition: PartitionId, res: Result<(), DynError>) {
+    async fn record(&self, partition: ObjectStorePathPartitionId, res: Result<(), DynError>) {
         match res {
             Ok(()) => self.inner.record(partition, Ok(())).await,
             Err(e) if self.kind.contains(&e.classify()) => {
@@ -81,32 +81,34 @@ mod tests {
         );
 
         sink.record(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             Err(Box::new(ObjectStoreError::NotImplemented)),
         )
         .await;
         sink.record(
-            PartitionId::new(2),
+            ObjectStorePathPartitionId::new(2),
             Err(Box::new(DataFusionError::ResourcesExhausted(String::from(
                 "foo",
             )))),
         )
         .await;
-        sink.record(PartitionId::new(3), Err("foo".into())).await;
-        sink.record(PartitionId::new(4), Ok(())).await;
+        sink.record(ObjectStorePathPartitionId::new(3), Err("foo".into()))
+            .await;
+        sink.record(ObjectStorePathPartitionId::new(4), Ok(()))
+            .await;
 
         assert_eq!(
             inner.results(),
             HashMap::from([
                 (
-                    PartitionId::new(1),
+                    ObjectStorePathPartitionId::new(1),
                     Err(String::from("Operation not yet implemented.")),
                 ),
                 (
-                    PartitionId::new(2),
+                    ObjectStorePathPartitionId::new(2),
                     Err(String::from("Resources exhausted: foo")),
                 ),
-                (PartitionId::new(4), Ok(()),),
+                (ObjectStorePathPartitionId::new(4), Ok(()),),
             ]),
         );
     }

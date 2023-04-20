@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use data_types::{Partition, PartitionId};
+use data_types::{ObjectStorePathPartitionId, Partition};
 
 use super::PartitionSource;
 
@@ -25,7 +25,7 @@ impl Display for MockPartitionSource {
 
 #[async_trait]
 impl PartitionSource for MockPartitionSource {
-    async fn fetch_by_id(&self, partition_id: PartitionId) -> Option<Partition> {
+    async fn fetch_by_id(&self, partition_id: ObjectStorePathPartitionId) -> Option<Partition> {
         self.partitions
             .iter()
             .find(|p| p.id == partition_id)
@@ -53,21 +53,24 @@ mod tests {
         let source = MockPartitionSource::new(partitions);
 
         assert_eq!(
-            source.fetch_by_id(PartitionId::new(5)).await,
+            source.fetch_by_id(ObjectStorePathPartitionId::new(5)).await,
             Some(p_1.clone())
         );
         assert_eq!(
-            source.fetch_by_id(PartitionId::new(1)).await,
+            source.fetch_by_id(ObjectStorePathPartitionId::new(1)).await,
             Some(p_2.clone())
         );
 
         // fetching does not drain
         assert_eq!(
-            source.fetch_by_id(PartitionId::new(5)).await,
+            source.fetch_by_id(ObjectStorePathPartitionId::new(5)).await,
             Some(p_1.clone())
         );
 
         // unknown table => None result
-        assert_eq!(source.fetch_by_id(PartitionId::new(3)).await, None,);
+        assert_eq!(
+            source.fetch_by_id(ObjectStorePathPartitionId::new(3)).await,
+            None,
+        );
     }
 }

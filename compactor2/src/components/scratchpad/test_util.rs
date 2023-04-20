@@ -1,6 +1,6 @@
 use std::{collections::HashSet, sync::Arc};
 
-use data_types::{NamespaceId, PartitionId, ShardId, TableId};
+use data_types::{NamespaceId, ObjectStorePathPartitionId, ShardId, TableId};
 use object_store::{memory::InMemory, DynObjectStore};
 use parquet_file::ParquetFilePath;
 use uuid::Uuid;
@@ -24,7 +24,7 @@ pub fn file_path(i: u128) -> ParquetFilePath {
         NamespaceId::new(1),
         TableId::new(1),
         ShardId::new(1),
-        PartitionId::new(1),
+        ObjectStorePathPartitionId::new(1),
         Uuid::from_u128(i),
     )
 }

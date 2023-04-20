@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 
 use async_trait::async_trait;
-use data_types::{ParquetFile, PartitionId};
+use data_types::{ObjectStorePathPartitionId, ParquetFile};
 
 pub mod catalog;
 pub mod mock;
@@ -14,5 +14,5 @@ pub trait PartitionFilesSource: Debug + Display + Send + Sync {
     /// This MUST NOT perform any filtering (expect for the "not marked for deletion" flag).
     ///
     /// This method performs retries.
-    async fn fetch(&self, partition: PartitionId) -> Vec<ParquetFile>;
+    async fn fetch(&self, partition: ObjectStorePathPartitionId) -> Vec<ParquetFile>;
 }

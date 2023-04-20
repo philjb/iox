@@ -197,7 +197,9 @@ mod tests {
         record_batch::RecordBatch,
     };
     use bytes::Bytes;
-    use data_types::{CompactionLevel, NamespaceId, PartitionId, SequenceNumber, ShardId, TableId};
+    use data_types::{
+        CompactionLevel, NamespaceId, ObjectStorePathPartitionId, SequenceNumber, ShardId, TableId,
+    };
     use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use datafusion_util::MemoryStream;
     use iox_time::Time;
@@ -213,7 +215,7 @@ mod tests {
             shard_id: ShardId::new(2),
             table_id: TableId::new(3),
             table_name: "platanos".into(),
-            partition_id: PartitionId::new(4),
+            partition_id: ObjectStorePathPartitionId::new(4),
             partition_key: "potato".into(),
             max_sequence_number: SequenceNumber::new(11),
             compaction_level: CompactionLevel::FileNonOverlapped,

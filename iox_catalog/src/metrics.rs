@@ -7,8 +7,8 @@ use crate::interface::{
 };
 use async_trait::async_trait;
 use data_types::{
-    Column, ColumnType, CompactionLevel, Namespace, NamespaceId, ParquetFile, ParquetFileId,
-    ParquetFileParams, Partition, PartitionId, PartitionKey, QueryPool, QueryPoolId,
+    Column, ColumnType, CompactionLevel, Namespace, NamespaceId, ObjectStorePathPartitionId,
+    ParquetFile, ParquetFileId, ParquetFileParams, Partition, PartitionKey, QueryPool, QueryPoolId,
     SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table, TableId, Timestamp,
     TopicId, TopicMetadata,
 };
@@ -230,16 +230,16 @@ decorate!(
     impl_trait = PartitionRepo,
     methods = [
         "partition_create_or_get" = create_or_get(&mut self, key: PartitionKey, shard_id: ShardId, table_id: TableId) -> Result<Partition>;
-        "partition_get_by_id" = get_by_id(&mut self, partition_id: PartitionId) -> Result<Option<Partition>>;
+        "partition_get_by_id" = get_by_id(&mut self, partition_id: ObjectStorePathPartitionId) -> Result<Option<Partition>>;
         "partition_list_by_table_id" = list_by_table_id(&mut self, table_id: TableId) -> Result<Vec<Partition>>;
-        "partition_list_ids" = list_ids(&mut self) -> Result<Vec<PartitionId>>;
-        "partition_update_sort_key" = cas_sort_key(&mut self, partition_id: PartitionId, old_sort_key: Option<Vec<String>>, new_sort_key: &[&str]) -> Result<Partition, CasFailure<Vec<String>>>;
-        "partition_record_skipped_compaction" = record_skipped_compaction(&mut self, partition_id: PartitionId, reason: &str, num_files: usize, limit_num_files: usize, limit_num_files_first_in_partition: usize, estimated_bytes: u64, limit_bytes: u64) -> Result<()>;
+        "partition_list_ids" = list_ids(&mut self) -> Result<Vec<ObjectStorePathPartitionId>>;
+        "partition_update_sort_key" = cas_sort_key(&mut self, partition_id: ObjectStorePathPartitionId, old_sort_key: Option<Vec<String>>, new_sort_key: &[&str]) -> Result<Partition, CasFailure<Vec<String>>>;
+        "partition_record_skipped_compaction" = record_skipped_compaction(&mut self, partition_id: ObjectStorePathPartitionId, reason: &str, num_files: usize, limit_num_files: usize, limit_num_files_first_in_partition: usize, estimated_bytes: u64, limit_bytes: u64) -> Result<()>;
         "partition_list_skipped_compactions" = list_skipped_compactions(&mut self) -> Result<Vec<SkippedCompaction>>;
-        "partition_delete_skipped_compactions" = delete_skipped_compactions(&mut self, partition_id: PartitionId) -> Result<Option<SkippedCompaction>>;
+        "partition_delete_skipped_compactions" = delete_skipped_compactions(&mut self, partition_id: ObjectStorePathPartitionId) -> Result<Option<SkippedCompaction>>;
         "partition_most_recent_n" = most_recent_n(&mut self, n: usize) -> Result<Vec<Partition>>;
-        "partitions_new_file_between" = partitions_new_file_between(&mut self, minimum_time: Timestamp, maximum_time: Option<Timestamp>) -> Result<Vec<PartitionId>>;
-        "get_in_skipped_compaction" = get_in_skipped_compaction(&mut self, partition_id: PartitionId) -> Result<Option<SkippedCompaction>>;
+        "partitions_new_file_between" = partitions_new_file_between(&mut self, minimum_time: Timestamp, maximum_time: Option<Timestamp>) -> Result<Vec<ObjectStorePathPartitionId>>;
+        "get_in_skipped_compaction" = get_in_skipped_compaction(&mut self, partition_id: ObjectStorePathPartitionId) -> Result<Option<SkippedCompaction>>;
     ]
 );
 
@@ -253,7 +253,7 @@ decorate!(
         "parquet_list_by_table_not_to_delete" = list_by_table_not_to_delete(&mut self, table_id: TableId) -> Result<Vec<ParquetFile>>;
         "parquet_list_by_table" = list_by_table(&mut self, table_id: TableId) -> Result<Vec<ParquetFile>>;
         "parquet_delete_old_ids_only" = delete_old_ids_only(&mut self, older_than: Timestamp) -> Result<Vec<ParquetFileId>>;
-        "parquet_list_by_partition_not_to_delete" = list_by_partition_not_to_delete(&mut self, partition_id: PartitionId) -> Result<Vec<ParquetFile>>;
+        "parquet_list_by_partition_not_to_delete" = list_by_partition_not_to_delete(&mut self, partition_id: ObjectStorePathPartitionId) -> Result<Vec<ParquetFile>>;
         "parquet_update_compaction_level" = update_compaction_level(&mut self, parquet_file_ids: &[ParquetFileId], compaction_level: CompactionLevel) -> Result<Vec<ParquetFileId>>;
         "parquet_exist" = exist(&mut self, id: ParquetFileId) -> Result<bool>;
         "parquet_count" = count(&mut self) -> Result<i64>;

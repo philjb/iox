@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use data_types::{CompactionLevel, PartitionId};
+use data_types::{CompactionLevel, ObjectStorePathPartitionId};
 use iox_time::{MockProvider, Time};
 
 use crate::components::{
@@ -13,9 +13,9 @@ use crate::components::{
 #[tokio::test]
 async fn test_unique_and_throttle() {
     let inner_source = Arc::new(MockPartitionsSource::new(vec![
-        PartitionId::new(1),
-        PartitionId::new(2),
-        PartitionId::new(3),
+        ObjectStorePathPartitionId::new(1),
+        ObjectStorePathPartitionId::new(2),
+        ObjectStorePathPartitionId::new(3),
     ]));
     let inner_commit = Arc::new(MockCommit::new());
     let inner_sink = Arc::new(MockPartitionDoneSink::new());
@@ -34,33 +34,47 @@ async fn test_unique_and_throttle() {
     assert_eq!(
         source.fetch().await,
         vec![
-            PartitionId::new(1),
-            PartitionId::new(2),
-            PartitionId::new(3)
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(2),
+            ObjectStorePathPartitionId::new(3)
         ],
     );
 
     assert_eq!(source.fetch().await, vec![],);
 
     commit
-        .commit(PartitionId::new(1), &[], &[], &[], CompactionLevel::Initial)
+        .commit(
+            ObjectStorePathPartitionId::new(1),
+            &[],
+            &[],
+            &[],
+            CompactionLevel::Initial,
+        )
         .await;
-    sink.record(PartitionId::new(1), Ok(())).await;
-    sink.record(PartitionId::new(2), Ok(())).await;
+    sink.record(ObjectStorePathPartitionId::new(1), Ok(()))
+        .await;
+    sink.record(ObjectStorePathPartitionId::new(2), Ok(()))
+        .await;
 
     inner_source.set(vec![
-        PartitionId::new(1),
-        PartitionId::new(2),
-        PartitionId::new(3),
-        PartitionId::new(4),
+        ObjectStorePathPartitionId::new(1),
+        ObjectStorePathPartitionId::new(2),
+        ObjectStorePathPartitionId::new(3),
+        ObjectStorePathPartitionId::new(4),
     ]);
 
     assert_eq!(
         source.fetch().await,
-        vec![PartitionId::new(1), PartitionId::new(4)],
+        vec![
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(4)
+        ],
     );
 
     time_provider.inc(Duration::from_secs(1));
 
-    assert_eq!(source.fetch().await, vec![PartitionId::new(2)],);
+    assert_eq!(
+        source.fetch().await,
+        vec![ObjectStorePathPartitionId::new(2)],
+    );
 }

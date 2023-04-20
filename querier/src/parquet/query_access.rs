@@ -1,5 +1,5 @@
 use crate::parquet::QuerierParquetChunk;
-use data_types::{ChunkId, ChunkOrder, DeletePredicate, PartitionId, TableSummary};
+use data_types::{ChunkId, ChunkOrder, DeletePredicate, ObjectStorePathPartitionId, TableSummary};
 use datafusion::error::DataFusionError;
 use iox_query::{
     exec::{stringset::StringSet, IOxSessionContext},
@@ -22,7 +22,7 @@ impl QueryChunkMeta for QuerierParquetChunk {
         self.partition_sort_key.as_ref().map(|sk| sk.as_ref())
     }
 
-    fn partition_id(&self) -> PartitionId {
+    fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.meta().partition_id()
     }
 

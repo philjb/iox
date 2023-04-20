@@ -5,9 +5,9 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use data_types::{
-    Column, ColumnSet, ColumnType, CompactionLevel, Namespace, NamespaceSchema, ParquetFile,
-    ParquetFileParams, Partition, PartitionId, QueryPool, SequenceNumber, Shard, ShardIndex, Table,
-    TableId, TableSchema, Timestamp, TopicMetadata,
+    Column, ColumnSet, ColumnType, CompactionLevel, Namespace, NamespaceSchema,
+    ObjectStorePathPartitionId, ParquetFile, ParquetFileParams, Partition, QueryPool,
+    SequenceNumber, Shard, ShardIndex, Table, TableId, TableSchema, Timestamp, TopicMetadata,
 };
 use datafusion::physical_plan::metrics::Count;
 use datafusion_util::MemoryStream;
@@ -213,7 +213,7 @@ impl TestCatalog {
     /// Add a partition into skipped compaction
     pub async fn add_to_skipped_compaction(
         self: &Arc<Self>,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         reason: &str,
     ) {
         let mut repos = self.catalog.repositories().await;
@@ -826,7 +826,7 @@ impl TestParquetFileBuilder {
 
 async fn update_catalog_sort_key_if_needed(
     partitions_catalog: &mut dyn PartitionRepo,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     sort_key: SortKey,
 ) {
     // Fetch the latest partition info from the catalog

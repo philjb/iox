@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use metric::{Registry, U64Counter};
 
 use super::PartitionsSource;
@@ -59,7 +59,7 @@ impl<T> PartitionsSource for MetricsPartitionsSourceWrapper<T>
 where
     T: PartitionsSource,
 {
-    async fn fetch(&self) -> Vec<PartitionId> {
+    async fn fetch(&self) -> Vec<ObjectStorePathPartitionId> {
         let partitions = self.inner.fetch().await;
         self.partitions_fetch_counter.inc(1);
         self.partitions_counter.inc(partitions.len() as u64);
@@ -87,9 +87,9 @@ mod tests {
     async fn test_fetch() {
         let registry = Registry::new();
         let partitions = vec![
-            PartitionId::new(5),
-            PartitionId::new(1),
-            PartitionId::new(12),
+            ObjectStorePathPartitionId::new(5),
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(12),
         ];
         let source = MetricsPartitionsSourceWrapper::new(
             MockPartitionsSource::new(partitions.clone()),

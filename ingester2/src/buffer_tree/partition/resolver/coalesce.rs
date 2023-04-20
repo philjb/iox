@@ -275,7 +275,7 @@ mod tests {
     };
 
     use assert_matches::assert_matches;
-    use data_types::{PartitionId, TRANSITION_SHARD_ID};
+    use data_types::{ObjectStorePathPartitionId, TRANSITION_SHARD_ID};
     use futures::Future;
     use futures::{stream::FuturesUnordered, StreamExt};
     use lazy_static::lazy_static;
@@ -286,7 +286,7 @@ mod tests {
 
     use super::*;
 
-    const PARTITION_ID: PartitionId = PartitionId::new(4242);
+    const PARTITION_ID: ObjectStorePathPartitionId = ObjectStorePathPartitionId::new(4242);
     const PARTITION_KEY: &str = "bananas";
     const NAMESPACE_ID: NamespaceId = NamespaceId::new(42);
     const TABLE_ID: TableId = TableId::new(42);

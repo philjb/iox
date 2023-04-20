@@ -5,7 +5,7 @@ use std::{any::Any, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_util::util::ensure_schema;
-use data_types::{ChunkId, ChunkOrder, DeletePredicate, PartitionId, TableSummary};
+use data_types::{ChunkId, ChunkOrder, DeletePredicate, ObjectStorePathPartitionId, TableSummary};
 use datafusion::error::DataFusionError;
 use iox_query::{
     exec::{stringset::StringSet, IOxSessionContext},
@@ -33,7 +33,7 @@ pub struct QueryAdaptor {
     data: Vec<Arc<RecordBatch>>,
 
     /// The catalog ID of the partition the this data is part of.
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
 
     /// Chunk ID.
     id: ChunkId,
@@ -52,7 +52,10 @@ impl QueryAdaptor {
     ///
     /// This constructor panics if `data` contains no [`RecordBatch`], or all
     /// [`RecordBatch`] are empty.
-    pub(crate) fn new(partition_id: PartitionId, data: Vec<Arc<RecordBatch>>) -> Self {
+    pub(crate) fn new(
+        partition_id: ObjectStorePathPartitionId,
+        data: Vec<Arc<RecordBatch>>,
+    ) -> Self {
         // There must always be at least one record batch and one row.
         //
         // This upholds an invariant that simplifies dealing with empty
@@ -104,7 +107,7 @@ impl QueryAdaptor {
 
     /// Returns the partition ID from which the data this [`QueryAdaptor`] was
     /// sourced from.
-    pub(crate) fn partition_id(&self) -> PartitionId {
+    pub(crate) fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 }
@@ -131,7 +134,7 @@ impl QueryChunkMeta for QueryAdaptor {
         None // Ingester data has not persisted yet and should not be attached to any partition
     }
 
-    fn partition_id(&self) -> PartitionId {
+    fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 

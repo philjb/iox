@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use observability_deps::tracing::{info, warn};
 
 use super::PartitionsSource;
@@ -42,7 +42,7 @@ impl<T> PartitionsSource for LoggingPartitionsSourceWrapper<T>
 where
     T: PartitionsSource,
 {
-    async fn fetch(&self) -> Vec<PartitionId> {
+    async fn fetch(&self) -> Vec<ObjectStorePathPartitionId> {
         let partitions = self.inner.fetch().await;
         info!(
             compaction_type = ?self.compaction_type,
@@ -91,9 +91,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_some_hot() {
-        let p_1 = PartitionId::new(5);
-        let p_2 = PartitionId::new(1);
-        let p_3 = PartitionId::new(12);
+        let p_1 = ObjectStorePathPartitionId::new(5);
+        let p_2 = ObjectStorePathPartitionId::new(1);
+        let p_3 = ObjectStorePathPartitionId::new(12);
         let partitions = vec![p_1, p_2, p_3];
 
         let source = LoggingPartitionsSourceWrapper::new(
@@ -111,9 +111,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_some_cold() {
-        let p_1 = PartitionId::new(5);
-        let p_2 = PartitionId::new(1);
-        let p_3 = PartitionId::new(12);
+        let p_1 = ObjectStorePathPartitionId::new(5);
+        let p_2 = ObjectStorePathPartitionId::new(1);
+        let p_3 = ObjectStorePathPartitionId::new(12);
         let partitions = vec![p_1, p_2, p_3];
 
         let source = LoggingPartitionsSourceWrapper::new(

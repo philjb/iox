@@ -2,7 +2,9 @@
 
 use async_trait::async_trait;
 use compactor2::{Commit, CommitWrapper};
-use data_types::{CompactionLevel, ParquetFile, ParquetFileId, ParquetFileParams, PartitionId};
+use data_types::{
+    CompactionLevel, ObjectStorePathPartitionId, ParquetFile, ParquetFileId, ParquetFileParams,
+};
 use std::{
     fmt::{Debug, Display},
     sync::{Arc, Mutex},
@@ -29,7 +31,7 @@ struct CommitRecorder {
 impl Commit for CommitRecorder {
     async fn commit(
         &self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         delete: &[ParquetFile],
         upgrade: &[ParquetFile],
         create: &[ParquetFileParams],

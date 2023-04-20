@@ -2,7 +2,7 @@
 use std::{collections::HashSet, fmt::Display, num::NonZeroUsize, sync::Arc, time::Duration};
 
 use backoff::{Backoff, BackoffConfig};
-use data_types::{PartitionId, ShardId, ShardIndex};
+use data_types::{ObjectStorePathPartitionId, ShardId, ShardIndex};
 use iox_catalog::interface::Catalog;
 use iox_query::exec::Executor;
 use iox_time::TimeProvider;
@@ -247,7 +247,7 @@ pub enum PartitionsSourceConfig {
     /// Use a fixed set of partitions.
     ///
     /// This is mostly useful for debugging.
-    Fixed(HashSet<PartitionId>),
+    Fixed(HashSet<ObjectStorePathPartitionId>),
 }
 
 impl Display for PartitionsSourceConfig {

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use datafusion::{
     common::tree_node::{Transformed, TreeNode},
     config::ConfigOptions,
@@ -41,8 +41,10 @@ impl PhysicalOptimizerRule for PartitionSplit {
                     return Ok(Transformed::No(plan));
                 };
 
-                let mut chunks_by_partition: HashMap<PartitionId, Vec<Arc<dyn QueryChunk>>> =
-                    Default::default();
+                let mut chunks_by_partition: HashMap<
+                    ObjectStorePathPartitionId,
+                    Vec<Arc<dyn QueryChunk>>,
+                > = Default::default();
                 for chunk in chunks {
                     chunks_by_partition
                         .entry(chunk.partition_id())

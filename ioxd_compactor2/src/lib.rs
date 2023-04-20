@@ -5,7 +5,7 @@ use compactor2::{
     compactor::Compactor2,
     config::{Config, PartitionsSourceConfig, ShardConfig},
 };
-use data_types::{PartitionId, TRANSITION_SHARD_NUMBER};
+use data_types::{ObjectStorePathPartitionId, TRANSITION_SHARD_NUMBER};
 use hyper::{Body, Request, Response};
 use iox_catalog::interface::Catalog;
 use iox_query::exec::Executor;
@@ -235,9 +235,12 @@ fn create_partition_source_config(
             threshold: Duration::from_secs(compaction_cold_partition_minute_threshold * 60),
         },
         (None, true, _) => PartitionsSourceConfig::CatalogAll,
-        (Some(ids), false, _) => {
-            PartitionsSourceConfig::Fixed(ids.iter().cloned().map(PartitionId::new).collect())
-        }
+        (Some(ids), false, _) => PartitionsSourceConfig::Fixed(
+            ids.iter()
+                .cloned()
+                .map(ObjectStorePathPartitionId::new)
+                .collect(),
+        ),
         (Some(_), true, _) => panic!(
             "provided partition ID filter and specific 'process all', this does not make sense"
         ),
@@ -274,7 +277,13 @@ mod tests {
 
         assert_eq!(
             partitions_source_config,
-            PartitionsSourceConfig::Fixed([PartitionId::new(1), PartitionId::new(7)].into())
+            PartitionsSourceConfig::Fixed(
+                [
+                    ObjectStorePathPartitionId::new(1),
+                    ObjectStorePathPartitionId::new(7)
+                ]
+                .into()
+            )
         );
     }
 

@@ -2,7 +2,7 @@
 //!
 //! [`QueryResponse`]: super::response::QueryResponse
 
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use datafusion::physical_plan::SendableRecordBatchStream;
 
 /// Response data for a single partition.
@@ -11,7 +11,7 @@ pub(crate) struct PartitionResponse {
     batches: Option<SendableRecordBatchStream>,
 
     /// Partition ID.
-    id: PartitionId,
+    id: ObjectStorePathPartitionId,
 
     /// Count of persisted Parquet files for this partition by this ingester instance.
     completed_persistence_count: u64,
@@ -39,7 +39,7 @@ impl std::fmt::Debug for PartitionResponse {
 impl PartitionResponse {
     pub(crate) fn new(
         data: Option<SendableRecordBatchStream>,
-        id: PartitionId,
+        id: ObjectStorePathPartitionId,
         completed_persistence_count: u64,
     ) -> Self {
         Self {
@@ -49,7 +49,7 @@ impl PartitionResponse {
         }
     }
 
-    pub(crate) fn id(&self) -> PartitionId {
+    pub(crate) fn id(&self) -> ObjectStorePathPartitionId {
         self.id
     }
 

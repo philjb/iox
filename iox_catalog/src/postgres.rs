@@ -12,10 +12,10 @@ use crate::{
 };
 use async_trait::async_trait;
 use data_types::{
-    Column, ColumnType, CompactionLevel, Namespace, NamespaceId, ParquetFile, ParquetFileId,
-    ParquetFileParams, Partition, PartitionHashId, PartitionId, PartitionKey, QueryPool,
-    QueryPoolId, SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table, TableId,
-    Timestamp, TopicId, TopicMetadata, TRANSITION_SHARD_ID, TRANSITION_SHARD_INDEX,
+    Column, ColumnType, CompactionLevel, Namespace, NamespaceId, ObjectStorePathPartitionId,
+    ParquetFile, ParquetFileId, ParquetFileParams, Partition, PartitionHashId, PartitionKey,
+    QueryPool, QueryPoolId, SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table,
+    TableId, Timestamp, TopicId, TopicMetadata, TRANSITION_SHARD_ID, TRANSITION_SHARD_INDEX,
 };
 use iox_time::{SystemProvider, TimeProvider};
 use observability_deps::tracing::{debug, info, warn};
@@ -1237,7 +1237,10 @@ RETURNING *;
         Ok(v)
     }
 
-    async fn get_by_id(&mut self, partition_id: PartitionId) -> Result<Option<Partition>> {
+    async fn get_by_id(
+        &mut self,
+        partition_id: ObjectStorePathPartitionId,
+    ) -> Result<Option<Partition>> {
         let rec = sqlx::query_as::<_, Partition>(r#"SELECT * FROM partition WHERE id = $1;"#)
             .bind(partition_id) // $1
             .fetch_one(&mut self.inner)
@@ -1266,7 +1269,7 @@ WHERE table_id = $1;
         .map_err(|e| Error::SqlxError { source: e })
     }
 
-    async fn list_ids(&mut self) -> Result<Vec<PartitionId>> {
+    async fn list_ids(&mut self) -> Result<Vec<ObjectStorePathPartitionId>> {
         sqlx::query_as(
             r#"
             SELECT p.id as partition_id
@@ -1286,7 +1289,7 @@ WHERE table_id = $1;
     /// round trips to service a transaction in the happy path).
     async fn cas_sort_key(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         old_sort_key: Option<Vec<String>>,
         new_sort_key: &[&str],
     ) -> Result<Partition, CasFailure<Vec<String>>> {
@@ -1344,7 +1347,7 @@ RETURNING *;
 
     async fn record_skipped_compaction(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         reason: &str,
         num_files: usize,
         limit_num_files: usize,
@@ -1385,7 +1388,7 @@ skipped_at = EXCLUDED.skipped_at;
 
     async fn get_in_skipped_compaction(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Option<SkippedCompaction>> {
         let rec = sqlx::query_as::<_, SkippedCompaction>(
             r#"SELECT * FROM skipped_compactions WHERE partition_id = $1;"#,
@@ -1416,7 +1419,7 @@ SELECT * FROM skipped_compactions
 
     async fn delete_skipped_compactions(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Option<SkippedCompaction>> {
         sqlx::query_as::<_, SkippedCompaction>(
             r#"
@@ -1443,7 +1446,7 @@ RETURNING *
         &mut self,
         minimum_time: Timestamp,
         maximum_time: Option<Timestamp>,
-    ) -> Result<Vec<PartitionId>> {
+    ) -> Result<Vec<ObjectStorePathPartitionId>> {
         let sql = format!(
             r#"
             SELECT p.id as partition_id
@@ -1650,7 +1653,7 @@ RETURNING id;
 
     async fn list_by_partition_not_to_delete(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Vec<ParquetFile>> {
         // Deliberately doesn't use `SELECT *` to avoid the performance hit of fetching the large
         // `parquet_metadata` column!!

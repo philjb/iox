@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display, sync::Mutex};
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 
 use crate::error::DynError;
 
@@ -9,7 +9,7 @@ use super::PartitionDoneSink;
 
 #[derive(Debug, Default)]
 pub struct MockPartitionDoneSink {
-    last: Mutex<HashMap<PartitionId, Result<(), String>>>,
+    last: Mutex<HashMap<ObjectStorePathPartitionId, Result<(), String>>>,
 }
 
 impl MockPartitionDoneSink {
@@ -18,7 +18,7 @@ impl MockPartitionDoneSink {
     }
 
     #[allow(dead_code)] // not used anywhere
-    pub fn results(&self) -> HashMap<PartitionId, Result<(), String>> {
+    pub fn results(&self) -> HashMap<ObjectStorePathPartitionId, Result<(), String>> {
         self.last.lock().expect("not poisoned").clone()
     }
 }
@@ -31,7 +31,7 @@ impl Display for MockPartitionDoneSink {
 
 #[async_trait]
 impl PartitionDoneSink for MockPartitionDoneSink {
-    async fn record(&self, partition: PartitionId, res: Result<(), DynError>) {
+    async fn record(&self, partition: ObjectStorePathPartitionId, res: Result<(), DynError>) {
         self.last
             .lock()
             .expect("not poisoned")
@@ -54,17 +54,27 @@ mod tests {
 
         assert_eq!(sink.results(), HashMap::default(),);
 
-        sink.record(PartitionId::new(1), Err("msg 1".into())).await;
-        sink.record(PartitionId::new(2), Err("msg 2".into())).await;
-        sink.record(PartitionId::new(1), Err("msg 3".into())).await;
-        sink.record(PartitionId::new(3), Ok(())).await;
+        sink.record(ObjectStorePathPartitionId::new(1), Err("msg 1".into()))
+            .await;
+        sink.record(ObjectStorePathPartitionId::new(2), Err("msg 2".into()))
+            .await;
+        sink.record(ObjectStorePathPartitionId::new(1), Err("msg 3".into()))
+            .await;
+        sink.record(ObjectStorePathPartitionId::new(3), Ok(()))
+            .await;
 
         assert_eq!(
             sink.results(),
             HashMap::from([
-                (PartitionId::new(1), Err(String::from("msg 3"))),
-                (PartitionId::new(2), Err(String::from("msg 2"))),
-                (PartitionId::new(3), Ok(())),
+                (
+                    ObjectStorePathPartitionId::new(1),
+                    Err(String::from("msg 3"))
+                ),
+                (
+                    ObjectStorePathPartitionId::new(2),
+                    Err(String::from("msg 2"))
+                ),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
             ]),
         );
     }

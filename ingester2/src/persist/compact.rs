@@ -107,7 +107,7 @@ pub(super) async fn compact_persisting_batch(
 mod tests {
     use arrow::record_batch::RecordBatch;
     use arrow_util::assert_batches_eq;
-    use data_types::PartitionId;
+    use data_types::ObjectStorePathPartitionId;
     use iox_query::test::{raw_data, TestChunk};
     use mutable_batch_lp::lines_to_batches;
     use schema::Projection;
@@ -127,7 +127,7 @@ mod tests {
             .to_arrow(Projection::All)
             .unwrap();
 
-        let batch = QueryAdaptor::new(PartitionId::new(1), vec![Arc::new(batch)]);
+        let batch = QueryAdaptor::new(ObjectStorePathPartitionId::new(1), vec![Arc::new(batch)]);
 
         // verify PK
         let schema = batch.schema();
@@ -162,7 +162,7 @@ mod tests {
     async fn test_compact_batch_on_one_record_batch_no_dupilcates() {
         // create input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_one_record_batch_with_influxtype_no_duplicates().await,
         );
 
@@ -211,7 +211,7 @@ mod tests {
     async fn test_compact_batch_no_sort_key() {
         // create input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_batches_with_influxtype_different_cardinality().await,
         );
 
@@ -265,7 +265,7 @@ mod tests {
     async fn test_compact_batch_with_specified_sort_key() {
         // create input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_batches_with_influxtype_different_cardinality().await,
         );
 
@@ -324,7 +324,7 @@ mod tests {
     async fn test_compact_batch_new_column_for_sort_key() {
         // create input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_batches_with_influxtype_different_cardinality().await,
         );
 
@@ -387,7 +387,7 @@ mod tests {
     async fn test_compact_batch_missing_column_for_sort_key() {
         // create input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_batches_with_influxtype_different_cardinality().await,
         );
 
@@ -449,7 +449,7 @@ mod tests {
 
         // create input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_one_row_record_batch_with_influxtype().await,
         );
 
@@ -490,7 +490,7 @@ mod tests {
     async fn test_compact_one_batch_with_duplicates() {
         // create input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_one_record_batch_with_influxtype_duplicates().await,
         );
 
@@ -538,7 +538,7 @@ mod tests {
     #[tokio::test]
     async fn test_compact_many_batches_same_columns_with_duplicates() {
         // create many-batches input data
-        let batch = QueryAdaptor::new(PartitionId::new(1), create_batches_with_influxtype().await);
+        let batch = QueryAdaptor::new(ObjectStorePathPartitionId::new(1), create_batches_with_influxtype().await);
 
         // verify PK
         let schema = batch.schema();
@@ -583,7 +583,7 @@ mod tests {
     async fn test_compact_many_batches_different_columns_with_duplicates() {
         // create many-batches input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_batches_with_influxtype_different_columns().await,
         );
 
@@ -634,7 +634,7 @@ mod tests {
     async fn test_compact_many_batches_different_columns_different_order_with_duplicates() {
         // create many-batches input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_batches_with_influxtype_different_columns_different_order().await,
         );
 
@@ -688,7 +688,7 @@ mod tests {
     async fn test_compact_many_batches_same_columns_different_types() {
         // create many-batches input data
         let batch = QueryAdaptor::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             create_batches_with_influxtype_same_columns_different_type().await,
         );
 

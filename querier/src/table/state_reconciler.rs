@@ -2,7 +2,7 @@
 
 mod interface;
 
-use data_types::{DeletePredicate, PartitionId};
+use data_types::{DeletePredicate, ObjectStorePathPartitionId};
 use iox_query::QueryChunk;
 use observability_deps::tracing::debug;
 use schema::sort::SortKey;
@@ -131,7 +131,7 @@ impl Reconciler {
         // sort key) because newer chunks have new columns.
         // However,  since the querier doesn't (yet) know about these chunks in the `chunks` list above
         // using the most up to date sort key from the chunks it does know about is sufficient.
-        let mut sort_keys = HashMap::<PartitionId, Arc<SortKey>>::new();
+        let mut sort_keys = HashMap::<ObjectStorePathPartitionId, Arc<SortKey>>::new();
         for c in &chunks {
             if let Some(sort_key) = c.partition_sort_key_arc() {
                 match sort_keys.entry(c.partition_id()) {
@@ -224,13 +224,13 @@ mod tests {
 
     #[derive(Debug)]
     struct MockIngesterPartitionInfo {
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         shard_id: ShardId,
         parquet_max_sequence_number: Option<SequenceNumber>,
     }
 
     impl IngesterPartitionInfo for MockIngesterPartitionInfo {
-        fn partition_id(&self) -> PartitionId {
+        fn partition_id(&self) -> ObjectStorePathPartitionId {
             self.partition_id
         }
 
@@ -245,13 +245,13 @@ mod tests {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct MockParquetFileInfo {
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         max_sequence_number: SequenceNumber,
         compaction_level: CompactionLevel,
     }
 
     impl ParquetFileInfo for MockParquetFileInfo {
-        fn partition_id(&self) -> PartitionId {
+        fn partition_id(&self) -> ObjectStorePathPartitionId {
             self.partition_id
         }
 

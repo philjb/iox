@@ -7,13 +7,15 @@ use std::{
 };
 
 use async_trait::async_trait;
-use data_types::{CompactionLevel, ParquetFile, ParquetFileId, ParquetFileParams, PartitionId};
+use data_types::{
+    CompactionLevel, ObjectStorePathPartitionId, ParquetFile, ParquetFileId, ParquetFileParams,
+};
 
 use super::Commit;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CommitHistoryEntry {
-    pub partition_id: PartitionId,
+    pub partition_id: ObjectStorePathPartitionId,
     pub delete: Vec<ParquetFile>,
     pub upgrade: Vec<ParquetFile>,
     pub created: Vec<ParquetFile>,
@@ -51,7 +53,7 @@ impl Display for MockCommit {
 impl Commit for MockCommit {
     async fn commit(
         &self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         delete: &[ParquetFile],
         upgrade: &[ParquetFile],
         create: &[ParquetFileParams],
@@ -112,7 +114,7 @@ mod tests {
 
         let ids = commit
             .commit(
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 &[existing_1.clone(), existing_2.clone()],
                 &[existing_3.clone(), existing_4.clone()],
                 &[created_1_1.clone().into(), created_1_2.clone().into()],
@@ -126,7 +128,7 @@ mod tests {
 
         let ids = commit
             .commit(
-                PartitionId::new(2),
+                ObjectStorePathPartitionId::new(2),
                 &[existing_3.clone()],
                 &[],
                 &[created_2_1.clone().into()],
@@ -137,7 +139,7 @@ mod tests {
 
         let ids = commit
             .commit(
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 &[existing_5.clone(), existing_6.clone(), existing_7.clone()],
                 &[],
                 &[created_1_3.clone().into()],
@@ -149,7 +151,7 @@ mod tests {
         // simulate fill implosion of the file (this may happen w/ delete predicates)
         let ids = commit
             .commit(
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 &[existing_8.clone()],
                 &[],
                 &[],
@@ -162,28 +164,28 @@ mod tests {
             commit.history(),
             vec![
                 CommitHistoryEntry {
-                    partition_id: PartitionId::new(1),
+                    partition_id: ObjectStorePathPartitionId::new(1),
                     delete: vec![existing_1, existing_2],
                     upgrade: vec![existing_3.clone(), existing_4.clone()],
                     created: vec![created_1_1, created_1_2],
                     target_level: CompactionLevel::FileNonOverlapped,
                 },
                 CommitHistoryEntry {
-                    partition_id: PartitionId::new(2),
+                    partition_id: ObjectStorePathPartitionId::new(2),
                     delete: vec![existing_3],
                     upgrade: vec![],
                     created: vec![created_2_1],
                     target_level: CompactionLevel::Final,
                 },
                 CommitHistoryEntry {
-                    partition_id: PartitionId::new(1),
+                    partition_id: ObjectStorePathPartitionId::new(1),
                     delete: vec![existing_5, existing_6, existing_7,],
                     upgrade: vec![],
                     created: vec![created_1_3],
                     target_level: CompactionLevel::FileNonOverlapped,
                 },
                 CommitHistoryEntry {
-                    partition_id: PartitionId::new(1),
+                    partition_id: ObjectStorePathPartitionId::new(1),
                     delete: vec![existing_8],
                     upgrade: vec![],
                     created: vec![],

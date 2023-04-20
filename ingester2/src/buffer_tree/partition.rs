@@ -3,7 +3,7 @@
 use std::{collections::VecDeque, sync::Arc};
 
 use data_types::{
-    sequence_number_set::SequenceNumberSet, NamespaceId, PartitionId, PartitionKey, SequenceNumber,
+    sequence_number_set::SequenceNumberSet, NamespaceId, ObjectStorePathPartitionId, PartitionKey, SequenceNumber,
     ShardId, TableId,
 };
 use mutable_batch::MutableBatch;
@@ -46,7 +46,7 @@ impl SortKeyState {
 #[derive(Debug)]
 pub struct PartitionData {
     /// The catalog ID of the partition this buffer is for.
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     /// The string partition key for this partition.
     partition_key: PartitionKey,
 
@@ -100,7 +100,7 @@ impl PartitionData {
     /// Initialize a new partition data buffer
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        id: PartitionId,
+        id: ObjectStorePathPartitionId,
         partition_key: PartitionKey,
         namespace_id: NamespaceId,
         namespace_name: Arc<DeferredLoad<NamespaceName>>,
@@ -280,7 +280,7 @@ impl PartitionData {
         fsm.into_sequence_number_set()
     }
 
-    pub(crate) fn partition_id(&self) -> PartitionId {
+    pub(crate) fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 
@@ -360,7 +360,7 @@ mod tests {
     use super::*;
     use crate::{buffer_tree::partition::resolver::SortKeyResolver, test_util::populate_catalog};
 
-    const PARTITION_ID: PartitionId = PartitionId::new(1);
+    const PARTITION_ID: ObjectStorePathPartitionId = ObjectStorePathPartitionId::new(1);
     const TRANSITION_SHARD_ID: ShardId = ShardId::new(84);
 
     lazy_static! {
@@ -983,7 +983,7 @@ mod tests {
             SortKeyState::Provided(Some(SortKey::from_columns(["banana", "time"])));
 
         let mut p = PartitionData::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             "bananas".into(),
             NamespaceId::new(42),
             Arc::new(DeferredLoad::new(Duration::from_secs(1), async {
@@ -1043,7 +1043,7 @@ mod tests {
         let starting_state = SortKeyState::Deferred(fetcher);
 
         let mut p = PartitionData::new(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             "bananas".into(),
             NamespaceId::new(42),
             Arc::new(DeferredLoad::new(Duration::from_secs(1), async {

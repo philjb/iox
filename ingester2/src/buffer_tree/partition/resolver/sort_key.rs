@@ -3,21 +3,21 @@
 use std::sync::Arc;
 
 use backoff::{Backoff, BackoffConfig};
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use iox_catalog::interface::Catalog;
 use schema::sort::SortKey;
 
-/// A resolver of [`SortKey`] from the catalog for a given [`PartitionId`].
+/// A resolver of [`SortKey`] from the catalog for a given [`ObjectStorePathPartitionId`].
 #[derive(Debug)]
 pub(crate) struct SortKeyResolver {
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     backoff_config: BackoffConfig,
     catalog: Arc<dyn Catalog>,
 }
 
 impl SortKeyResolver {
     pub(crate) fn new(
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         catalog: Arc<dyn Catalog>,
         backoff_config: BackoffConfig,
     ) -> Self {

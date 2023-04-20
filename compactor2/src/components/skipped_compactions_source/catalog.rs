@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
 use backoff::{Backoff, BackoffConfig};
-use data_types::{PartitionId, SkippedCompaction};
+use data_types::{ObjectStorePathPartitionId, SkippedCompaction};
 use iox_catalog::interface::Catalog;
 
 use super::SkippedCompactionsSource;
@@ -30,7 +30,7 @@ impl Display for CatalogSkippedCompactionsSource {
 
 #[async_trait]
 impl SkippedCompactionsSource for CatalogSkippedCompactionsSource {
-    async fn fetch(&self, partition: PartitionId) -> Option<SkippedCompaction> {
+    async fn fetch(&self, partition: ObjectStorePathPartitionId) -> Option<SkippedCompaction> {
         Backoff::new(&self.backoff_config)
             .retry_all_errors("skipped_compaction_of_given_partition", || async {
                 self.catalog

@@ -262,7 +262,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_trait::async_trait;
-    use data_types::{NamespaceId, PartitionId, PartitionKey, ShardId, TableId};
+    use data_types::{NamespaceId, ObjectStorePathPartitionId, PartitionKey, ShardId, TableId};
     use metric::{Attributes, Metric};
     use parking_lot::Mutex;
     use wal::Wal;
@@ -278,7 +278,7 @@ mod tests {
 
     use super::*;
 
-    const PARTITION_ID: PartitionId = PartitionId::new(42);
+    const PARTITION_ID: ObjectStorePathPartitionId = ObjectStorePathPartitionId::new(42);
     const TABLE_ID: TableId = TableId::new(44);
     const TABLE_NAME: &str = "bananas";
     const NAMESPACE_NAME: &str = "platanos";

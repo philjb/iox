@@ -15,7 +15,9 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use async_trait::async_trait;
-use data_types::{ChunkId, ChunkOrder, DeletePredicate, InfluxDbType, PartitionId, TableSummary};
+use data_types::{
+    ChunkId, ChunkOrder, DeletePredicate, InfluxDbType, ObjectStorePathPartitionId, TableSummary,
+};
 use datafusion::{error::DataFusionError, prelude::SessionContext};
 use exec::{stringset::StringSet, IOxSessionContext};
 use hashbrown::HashMap;
@@ -68,7 +70,7 @@ pub trait QueryChunkMeta {
     fn partition_sort_key(&self) -> Option<&SortKey>;
 
     /// Return partition id for this chunk
-    fn partition_id(&self) -> PartitionId;
+    fn partition_id(&self) -> ObjectStorePathPartitionId;
 
     /// return a reference to the sort key if any
     fn sort_key(&self) -> Option<&SortKey>;
@@ -309,7 +311,7 @@ where
         self.as_ref().schema()
     }
 
-    fn partition_id(&self) -> PartitionId {
+    fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.as_ref().partition_id()
     }
 
@@ -338,7 +340,7 @@ impl QueryChunkMeta for Arc<dyn QueryChunk> {
         self.as_ref().schema()
     }
 
-    fn partition_id(&self) -> PartitionId {
+    fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.as_ref().partition_id()
     }
 

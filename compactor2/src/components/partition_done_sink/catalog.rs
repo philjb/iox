@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
 use backoff::{Backoff, BackoffConfig};
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use iox_catalog::interface::Catalog;
 
 use crate::error::DynError;
@@ -32,7 +32,7 @@ impl Display for CatalogPartitionDoneSink {
 
 #[async_trait]
 impl PartitionDoneSink for CatalogPartitionDoneSink {
-    async fn record(&self, partition: PartitionId, res: Result<(), DynError>) {
+    async fn record(&self, partition: ObjectStorePathPartitionId, res: Result<(), DynError>) {
         if let Err(e) = res {
             let msg = e.to_string();
 

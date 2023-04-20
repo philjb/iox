@@ -5,8 +5,8 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use data_types::{
-    ColumnId, CompactionLevel, NamespaceId, PartitionId, SequenceNumber, ShardId, TableId,
-    Timestamp,
+    ColumnId, CompactionLevel, NamespaceId, ObjectStorePathPartitionId, SequenceNumber, ShardId,
+    TableId, Timestamp,
 };
 use datafusion_util::MemoryStream;
 use iox_time::Time;
@@ -57,7 +57,7 @@ async fn test_decoded_iox_metadata() {
         shard_id: ShardId::new(2),
         table_id: TableId::new(3),
         table_name: "platanos".into(),
-        partition_id: PartitionId::new(4),
+        partition_id: ObjectStorePathPartitionId::new(4),
         partition_key: "potato".into(),
         max_sequence_number: SequenceNumber::new(11),
         compaction_level: CompactionLevel::FileNonOverlapped,
@@ -199,7 +199,7 @@ async fn test_empty_parquet_file_panic() {
         shard_id: ShardId::new(2),
         table_id: TableId::new(3),
         table_name: "platanos".into(),
-        partition_id: PartitionId::new(4),
+        partition_id: ObjectStorePathPartitionId::new(4),
         partition_key: "potato".into(),
         max_sequence_number: SequenceNumber::new(11),
         compaction_level: CompactionLevel::FileNonOverlapped,
@@ -294,7 +294,7 @@ async fn test_decoded_many_columns_with_null_cols_iox_metadata() {
         shard_id: ShardId::new(2),
         table_id: TableId::new(3),
         table_name: "platanos".into(),
-        partition_id: PartitionId::new(4),
+        partition_id: ObjectStorePathPartitionId::new(4),
         partition_key: "potato".into(),
         max_sequence_number: SequenceNumber::new(11),
         compaction_level: CompactionLevel::FileNonOverlapped,
@@ -374,7 +374,7 @@ async fn test_derive_parquet_file_params() {
 
     // And the metadata the batch would be encoded with if it came through the
     // IOx write path.
-    let partition_id = PartitionId::new(4);
+    let partition_id = ObjectStorePathPartitionId::new(4);
     let meta = IoxMetadata {
         object_store_id: Default::default(),
         creation_timestamp: Time::from_timestamp_nanos(1234),

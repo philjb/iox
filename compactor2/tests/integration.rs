@@ -1,6 +1,6 @@
 use arrow_util::assert_batches_sorted_eq;
 use compactor2_test_utils::{format_files, list_object_store, TestSetup, TestSetupBuilder};
-use data_types::{CompactionLevel, ParquetFile, PartitionId};
+use data_types::{CompactionLevel, ObjectStorePathPartitionId, ParquetFile};
 use iox_tests::TestParquetFileBuilder;
 use test_helpers::{assert_contains, tracing::TracingCapture};
 
@@ -703,7 +703,7 @@ fn assert_max_l0_created_at<'a>(
 
 async fn assert_skipped_compactions<const N: usize>(
     setup: &TestSetup,
-    expected: [(PartitionId, &'static str); N],
+    expected: [(ObjectStorePathPartitionId, &'static str); N],
 ) {
     let skipped = setup
         .catalog

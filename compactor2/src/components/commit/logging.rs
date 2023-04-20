@@ -1,7 +1,9 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use data_types::{CompactionLevel, ParquetFile, ParquetFileId, ParquetFileParams, PartitionId};
+use data_types::{
+    CompactionLevel, ObjectStorePathPartitionId, ParquetFile, ParquetFileId, ParquetFileParams,
+};
 use observability_deps::tracing::info;
 
 use super::Commit;
@@ -39,7 +41,7 @@ where
 {
     async fn commit(
         &self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         delete: &[ParquetFile],
         upgrade: &[ParquetFile],
         create: &[ParquetFileParams],
@@ -117,7 +119,7 @@ mod tests {
 
         let ids = commit
             .commit(
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 &[existing_1.clone()],
                 &[],
                 &[created_1.clone().into(), created_2.clone().into()],
@@ -131,7 +133,7 @@ mod tests {
 
         let ids = commit
             .commit(
-                PartitionId::new(2),
+                ObjectStorePathPartitionId::new(2),
                 &[existing_2.clone(), existing_3.clone()],
                 &[existing_1.clone()],
                 &[],
@@ -150,14 +152,14 @@ level = INFO; message = committed parquet file change; target_level = Final; par
             inner.history(),
             vec![
                 CommitHistoryEntry {
-                    partition_id: PartitionId::new(1),
+                    partition_id: ObjectStorePathPartitionId::new(1),
                     delete: vec![existing_1.clone()],
                     upgrade: vec![],
                     created: vec![created_1, created_2],
                     target_level: CompactionLevel::Final,
                 },
                 CommitHistoryEntry {
-                    partition_id: PartitionId::new(2),
+                    partition_id: ObjectStorePathPartitionId::new(2),
                     delete: vec![existing_2, existing_3],
                     upgrade: vec![existing_1],
                     created: vec![],

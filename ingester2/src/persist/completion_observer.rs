@@ -1,7 +1,7 @@
 use std::{fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
-use data_types::{sequence_number_set::SequenceNumberSet, NamespaceId, PartitionId, TableId};
+use data_types::{sequence_number_set::SequenceNumberSet, NamespaceId, ObjectStorePathPartitionId, TableId};
 
 /// An abstract observer of persistence completion events.
 ///
@@ -27,7 +27,7 @@ pub struct CompletedPersist {
     /// The catalog identifiers for the persisted partition.
     namespace_id: NamespaceId,
     table_id: TableId,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
 
     /// The [`SequenceNumberSet`] of the persisted data.
     sequence_numbers: SequenceNumberSet,
@@ -38,7 +38,7 @@ impl CompletedPersist {
     pub(crate) fn new(
         namespace_id: NamespaceId,
         table_id: TableId,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         sequence_numbers: SequenceNumberSet,
     ) -> Self {
         Self {
@@ -59,8 +59,8 @@ impl CompletedPersist {
         self.table_id
     }
 
-    /// Returns the [`PartitionId`] of the persisted data.
-    pub(crate) fn partition_id(&self) -> PartitionId {
+    /// Returns the [`ObjectStorePathPartitionId`] of the persisted data.
+    pub(crate) fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 
@@ -151,7 +151,7 @@ mod tests {
         let note = Arc::new(CompletedPersist::new(
             NamespaceId::new(1),
             TableId::new(2),
-            PartitionId::new(3),
+            ObjectStorePathPartitionId::new(3),
             orig_set.clone(),
         ));
 
@@ -167,7 +167,7 @@ mod tests {
         let note = Arc::new(CompletedPersist::new(
             NamespaceId::new(1),
             TableId::new(2),
-            PartitionId::new(3),
+            ObjectStorePathPartitionId::new(3),
             orig_set.clone(),
         ));
 

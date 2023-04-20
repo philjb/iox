@@ -7,7 +7,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use futures::StreamExt;
 
 use crate::components::{
@@ -34,8 +34,8 @@ use crate::components::{
 /// | Step |  Name                 | Type                                                        | Description |
 /// | ---- | --------------------- | ----------------------------------------------------------- | ----------- |
 /// | 1    | **Actual source**     | `inner_source`/`T1`/[`PartitionsSource`], wrapped           | This is the actual source, e.g. a [catalog](crate::components::partitions_source::catalog_to_compact::CatalogToCompactPartitionsSource) |
-/// | 2    | **Unique IDs source** | [`UniquePartionsSourceWrapper`], wraps `inner_source`/`T1`  | Outputs that [`PartitionId`]s from the `inner_source` but filters out partitions that have not yet reached the uniqueness sink (step 4) |
-/// | 3    | **Critical section**  | --                           | Here it is always ensured that a single [`PartitionId`] does NOT occur more than once. |
+/// | 2    | **Unique IDs source** | [`UniquePartionsSourceWrapper`], wraps `inner_source`/`T1`  | Outputs the identifiers of the partitions from the `inner_source` but filters out partitions that have not yet reached the uniqueness sink (step 4) |
+/// | 3    | **Critical section**  | --                           | Here it is always ensured that a single partition's identifier does NOT occur more than once. |
 /// | 4    | **Unique IDs sink**   | [`UniquePartitionDoneSinkWrapper`], wraps `inner_sink`/`T2` | Observes incoming IDs and removes them from the filter applied in step 2. |
 /// | 5    | **Actual sink**       | `inner_sink`/`T2`/[`PartitionDoneSink`], wrapped            | The actual sink. Directly receives all partitions filtered out at step 2. |
 ///
@@ -69,7 +69,7 @@ where
     (source, sink)
 }
 
-type InFlight = Arc<Mutex<HashSet<PartitionId>>>;
+type InFlight = Arc<Mutex<HashSet<ObjectStorePathPartitionId>>>;
 
 #[derive(Debug)]
 pub struct UniquePartionsSourceWrapper<T1, T2>
@@ -99,7 +99,7 @@ where
     T1: PartitionsSource,
     T2: PartitionDoneSink,
 {
-    async fn fetch(&self) -> Vec<PartitionId> {
+    async fn fetch(&self) -> Vec<ObjectStorePathPartitionId> {
         let res = self.inner_source.fetch().await;
 
         let (unique, duplicates) = {
@@ -153,7 +153,7 @@ where
 {
     async fn record(
         &self,
-        partition: PartitionId,
+        partition: ObjectStorePathPartitionId,
         res: Result<(), Box<dyn std::error::Error + Send + Sync>>,
     ) {
         let existing = {
@@ -202,11 +202,11 @@ mod tests {
     #[tokio::test]
     async fn test_unique() {
         let inner_source = Arc::new(MockPartitionsSource::new(vec![
-            PartitionId::new(1),
-            PartitionId::new(1),
-            PartitionId::new(2),
-            PartitionId::new(3),
-            PartitionId::new(4),
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(2),
+            ObjectStorePathPartitionId::new(3),
+            ObjectStorePathPartitionId::new(4),
         ]));
         let inner_sink = Arc::new(MockPartitionDoneSink::new());
         let (source, sink) =
@@ -217,77 +217,94 @@ mod tests {
         assert_eq!(
             source.fetch().await,
             vec![
-                PartitionId::new(1),
-                PartitionId::new(2),
-                PartitionId::new(3),
-                PartitionId::new(4),
+                ObjectStorePathPartitionId::new(1),
+                ObjectStorePathPartitionId::new(2),
+                ObjectStorePathPartitionId::new(3),
+                ObjectStorePathPartitionId::new(4),
             ],
         );
         assert_eq!(
             inner_sink.results(),
-            HashMap::from([(PartitionId::new(1), Ok(()))]),
+            HashMap::from([(ObjectStorePathPartitionId::new(1), Ok(()))]),
         );
 
         // record
-        sink.record(PartitionId::new(1), Ok(())).await;
-        sink.record(PartitionId::new(2), Ok(())).await;
-
-        assert_eq!(
-            inner_sink.results(),
-            HashMap::from([(PartitionId::new(1), Ok(())), (PartitionId::new(2), Ok(())),]),
-        );
-
-        assert_eq!(
-            inner_sink.results(),
-            HashMap::from([(PartitionId::new(1), Ok(())), (PartitionId::new(2), Ok(()))]),
-        );
-
-        // ========== Round 2 ==========
-        inner_source.set(vec![
-            PartitionId::new(1),
-            PartitionId::new(3),
-            PartitionId::new(5),
-        ]);
-
-        // fetch
-        assert_eq!(
-            source.fetch().await,
-            vec![PartitionId::new(1), PartitionId::new(5)],
-        );
-
-        assert_eq!(
-            inner_sink.results(),
-            HashMap::from([
-                (PartitionId::new(1), Ok(())),
-                (PartitionId::new(2), Ok(())),
-                (PartitionId::new(3), Ok(())),
-            ]),
-        );
-
-        // record
-        sink.record(PartitionId::new(1), Err(String::from("foo").into()))
+        sink.record(ObjectStorePathPartitionId::new(1), Ok(()))
+            .await;
+        sink.record(ObjectStorePathPartitionId::new(2), Ok(()))
             .await;
 
         assert_eq!(
             inner_sink.results(),
             HashMap::from([
-                (PartitionId::new(1), Err(String::from("foo"))),
-                (PartitionId::new(2), Ok(())),
-                (PartitionId::new(3), Ok(())),
+                (ObjectStorePathPartitionId::new(1), Ok(())),
+                (ObjectStorePathPartitionId::new(2), Ok(())),
+            ]),
+        );
+
+        assert_eq!(
+            inner_sink.results(),
+            HashMap::from([
+                (ObjectStorePathPartitionId::new(1), Ok(())),
+                (ObjectStorePathPartitionId::new(2), Ok(()))
+            ]),
+        );
+
+        // ========== Round 2 ==========
+        inner_source.set(vec![
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(3),
+            ObjectStorePathPartitionId::new(5),
+        ]);
+
+        // fetch
+        assert_eq!(
+            source.fetch().await,
+            vec![
+                ObjectStorePathPartitionId::new(1),
+                ObjectStorePathPartitionId::new(5)
+            ],
+        );
+
+        assert_eq!(
+            inner_sink.results(),
+            HashMap::from([
+                (ObjectStorePathPartitionId::new(1), Ok(())),
+                (ObjectStorePathPartitionId::new(2), Ok(())),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
+            ]),
+        );
+
+        // record
+        sink.record(
+            ObjectStorePathPartitionId::new(1),
+            Err(String::from("foo").into()),
+        )
+        .await;
+
+        assert_eq!(
+            inner_sink.results(),
+            HashMap::from([
+                (ObjectStorePathPartitionId::new(1), Err(String::from("foo"))),
+                (ObjectStorePathPartitionId::new(2), Ok(())),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
             ]),
         );
 
         // ========== Round 3 ==========
         // fetch
-        assert_eq!(source.fetch().await, vec![PartitionId::new(1)],);
+        assert_eq!(
+            source.fetch().await,
+            vec![ObjectStorePathPartitionId::new(1)],
+        );
 
         assert_eq!(
             inner_sink.results(),
             HashMap::from([
-                (PartitionId::new(1), Err(String::from("foo"))),
-                (PartitionId::new(2), Ok(())),
-                (PartitionId::new(3), Ok(())),
-                (PartitionId::new(5), Ok(())),
+                (ObjectStorePathPartitionId::new(1), Err(String::from("foo"))),
+                (ObjectStorePathPartitionId::new(2), Ok(())),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
+                (ObjectStorePathPartitionId::new(5), Ok(())),
             ]),
         );
     }
@@ -296,7 +313,7 @@ mod tests {
     #[should_panic(expected = "Unknown or already done partition in sink: 1")]
     async fn test_panic_sink_unknown() {
         let (source, sink) = unique_partitions(
-            MockPartitionsSource::new(vec![PartitionId::new(1)]),
+            MockPartitionsSource::new(vec![ObjectStorePathPartitionId::new(1)]),
             MockPartitionDoneSink::new(),
             1,
         );

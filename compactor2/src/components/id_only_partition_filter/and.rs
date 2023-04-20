@@ -1,6 +1,6 @@
 use std::{fmt::Display, sync::Arc};
 
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 
 use super::IdOnlyPartitionFilter;
 
@@ -29,7 +29,7 @@ impl Display for AndIdOnlyPartitionFilter {
 }
 
 impl IdOnlyPartitionFilter for AndIdOnlyPartitionFilter {
-    fn apply(&self, partition_id: PartitionId) -> bool {
+    fn apply(&self, partition_id: ObjectStorePathPartitionId) -> bool {
         self.filters.iter().all(|filter| filter.apply(partition_id))
     }
 }
@@ -65,24 +65,24 @@ mod tests {
     #[test]
     fn tets_apply_empty() {
         let filter = AndIdOnlyPartitionFilter::new(vec![]);
-        assert!(filter.apply(PartitionId::new(1)));
+        assert!(filter.apply(ObjectStorePathPartitionId::new(1)));
     }
 
     #[test]
     fn tets_apply_and() {
         let filter = AndIdOnlyPartitionFilter::new(vec![
             Arc::new(ByIdPartitionFilter::new(HashSet::from([
-                PartitionId::new(1),
-                PartitionId::new(2),
+                ObjectStorePathPartitionId::new(1),
+                ObjectStorePathPartitionId::new(2),
             ]))),
             Arc::new(ByIdPartitionFilter::new(HashSet::from([
-                PartitionId::new(1),
-                PartitionId::new(3),
+                ObjectStorePathPartitionId::new(1),
+                ObjectStorePathPartitionId::new(3),
             ]))),
         ]);
-        assert!(filter.apply(PartitionId::new(1)));
-        assert!(!filter.apply(PartitionId::new(2)));
-        assert!(!filter.apply(PartitionId::new(3)));
-        assert!(!filter.apply(PartitionId::new(4)));
+        assert!(filter.apply(ObjectStorePathPartitionId::new(1)));
+        assert!(!filter.apply(ObjectStorePathPartitionId::new(2)));
+        assert!(!filter.apply(ObjectStorePathPartitionId::new(3)));
+        assert!(!filter.apply(ObjectStorePathPartitionId::new(4)));
     }
 }

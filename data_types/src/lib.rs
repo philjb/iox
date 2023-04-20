@@ -279,10 +279,10 @@ impl std::str::FromStr for ShardIndex {
 /// Unique ID for a `Partition`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, sqlx::Type, sqlx::FromRow)]
 #[sqlx(transparent)]
-pub struct PartitionId(i64);
+pub struct ObjectStorePathPartitionId(i64);
 
 #[allow(missing_docs)]
-impl PartitionId {
+impl ObjectStorePathPartitionId {
     pub const fn new(v: i64) -> Self {
         Self(v)
     }
@@ -291,7 +291,7 @@ impl PartitionId {
     }
 }
 
-impl std::fmt::Display for PartitionId {
+impl std::fmt::Display for ObjectStorePathPartitionId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -969,8 +969,10 @@ where
 /// one record can exist for each combo)
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
 pub struct Partition {
-    /// the id of the partition
-    pub id: PartitionId,
+    /// The ID of the partition assigned by the database. This should not be used to look up the
+    /// Partition information (use the `PartitionHashId` for that purpose); it should only be used
+    /// as part of the object store path when persisting Parquet files.
+    pub id: ObjectStorePathPartitionId,
     /// The unique hash derived from the table ID and partition key, if available. This will become
     /// required when the value has been backfilled for all partitions.
     pub hash_id: Option<PartitionHashId>,
@@ -1034,7 +1036,7 @@ impl Partition {
     /// doing so. If you have computed the [`PartitionHashId`], construct the `Partition` instance
     /// directly using the public field access.
     pub fn new(
-        id: PartitionId,
+        id: ObjectStorePathPartitionId,
         shard_id: ShardId,
         table_id: TableId,
         partition_key: PartitionKey,
@@ -1069,7 +1071,7 @@ impl Partition {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, sqlx::FromRow)]
 pub struct SkippedCompaction {
     /// the partition
-    pub partition_id: PartitionId,
+    pub partition_id: ObjectStorePathPartitionId,
     /// the reason compaction was skipped
     pub reason: String,
     /// when compaction was skipped
@@ -1147,7 +1149,7 @@ pub struct ParquetFile {
     /// the table
     pub table_id: TableId,
     /// the partition
-    pub partition_id: PartitionId,
+    pub partition_id: ObjectStorePathPartitionId,
     /// the uuid used in the object store path for this file
     pub object_store_id: Uuid,
     /// the maximum sequence number from a record in this file
@@ -1249,7 +1251,7 @@ pub struct ParquetFileParams {
     /// the table
     pub table_id: TableId,
     /// the partition
-    pub partition_id: PartitionId,
+    pub partition_id: ObjectStorePathPartitionId,
     /// the uuid used in the object store path for this file
     pub object_store_id: Uuid,
     /// the maximum sequence number from a record in this file

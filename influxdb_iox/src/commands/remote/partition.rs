@@ -5,8 +5,8 @@ use clap_blocks::object_store::{make_object_store, ObjectStoreType};
 use clap_blocks::{catalog_dsn::CatalogDsnConfig, object_store::ObjectStoreConfig};
 use data_types::{
     ColumnId, ColumnSet, ColumnType, NamespaceId, NamespaceSchema as CatalogNamespaceSchema,
-    ParquetFile as CatalogParquetFile, ParquetFileParams, PartitionId, SequenceNumber, ShardId,
-    ShardIndex, TableId, Timestamp,
+    ObjectStorePathPartitionId, ParquetFile as CatalogParquetFile, ParquetFileParams,
+    SequenceNumber, ShardId, ShardIndex, TableId, Timestamp,
 };
 use futures::future::join_all;
 use influxdb_iox_client::{
@@ -384,7 +384,7 @@ async fn load_parquet_files(
 struct PartitionMapping {
     shard_id: ShardId,
     table_id: TableId,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     remote_partition_id: i64,
 }
 

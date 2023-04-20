@@ -522,7 +522,7 @@ mod tests {
     use super::*;
 
     use arrow::array::{Float32Array, Int64Array};
-    use data_types::PartitionId;
+    use data_types::ObjectStorePathPartitionId;
     use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
     use futures::{stream, StreamExt};
     use iox_time::MockProvider;
@@ -541,7 +541,7 @@ mod tests {
         // Construct a stream with no batches.
         let stream = PartitionStream::new(stream::iter([PartitionResponse::new(
             None,
-            PartitionId::new(42),
+            ObjectStorePathPartitionId::new(42),
             42,
         )]));
 
@@ -628,7 +628,7 @@ mod tests {
 
         // Construct the set of partitions and their record batches
         let stream = make_partition_stream!(
-            PartitionId::new(1) => [
+            ObjectStorePathPartitionId::new(1) => [
                 make_batch!(
                     Int64Array("a" => vec![1, 2, 3, 4, 5]),
                     Float32Array("b" => vec![4.1, 4.2, 4.3, 4.4, 5.0]),
@@ -637,7 +637,7 @@ mod tests {
                     Int64Array("c" => vec![1, 2, 3, 4, 5]),
                 ),
             ],
-            PartitionId::new(2) => [
+            ObjectStorePathPartitionId::new(2) => [
                 make_batch!(
                     Float32Array("d" => vec![1.1]),
                 ),
@@ -726,7 +726,7 @@ mod tests {
 
         // Construct the set of partitions and their record batches
         let stream = make_partition_stream!(
-            PartitionId::new(1) => [
+            ObjectStorePathPartitionId::new(1) => [
                 make_batch!(
                     Int64Array("a" => vec![1, 2, 3, 4, 5]),
                     Float32Array("b" => vec![4.1, 4.2, 4.3, 4.4, 5.0]),
@@ -735,7 +735,7 @@ mod tests {
                     Int64Array("c" => vec![1, 2, 3, 4, 5]),
                 ),
             ],
-            PartitionId::new(2) => [
+            ObjectStorePathPartitionId::new(2) => [
                 make_batch!(
                     Float32Array("d" => vec![1.1]),
                 ),
@@ -820,7 +820,7 @@ mod tests {
 
         // Construct the set of partitions and their record batches
         let stream = make_partition_stream!(
-            PartitionId::new(1) => [
+            ObjectStorePathPartitionId::new(1) => [
                 make_batch!(
                     Int64Array("a" => vec![1, 2, 3, 4, 5]),
                     Float32Array("b" => vec![4.1, 4.2, 4.3, 4.4, 5.0]),
@@ -829,7 +829,7 @@ mod tests {
                     Int64Array("c" => vec![1, 2, 3, 4, 5]),
                 ),
             ],
-            PartitionId::new(2) => [
+            ObjectStorePathPartitionId::new(2) => [
                 make_batch!(
                     Float32Array("d" => vec![1.1]),
                 ),
@@ -932,7 +932,7 @@ mod tests {
 
         let stream = PartitionStream::new(stream::iter([PartitionResponse::new(
             Some(stream),
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             42,
         )]));
 
@@ -1039,7 +1039,7 @@ mod tests {
 
         let stream = PartitionStream::new(stream::iter([PartitionResponse::new(
             Some(stream),
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             42,
         )]));
 

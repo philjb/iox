@@ -3,9 +3,9 @@
 use async_trait::async_trait;
 use data_types::{
     Column, ColumnSchema, ColumnType, CompactionLevel, Namespace, NamespaceId, NamespaceSchema,
-    ParquetFile, ParquetFileId, ParquetFileParams, Partition, PartitionId, PartitionKey, QueryPool,
-    QueryPoolId, SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table, TableId,
-    TableSchema, Timestamp, TopicId, TopicMetadata,
+    ObjectStorePathPartitionId, ParquetFile, ParquetFileId, ParquetFileParams, Partition,
+    PartitionKey, QueryPool, QueryPoolId, SequenceNumber, Shard, ShardId, ShardIndex,
+    SkippedCompaction, Table, TableId, TableSchema, Timestamp, TopicId, TopicMetadata,
 };
 use iox_time::TimeProvider;
 use snafu::{OptionExt, Snafu};
@@ -65,7 +65,7 @@ pub enum Error {
     TableNotFound { id: TableId },
 
     #[snafu(display("partition {} not found", id))]
-    PartitionNotFound { id: PartitionId },
+    PartitionNotFound { id: ObjectStorePathPartitionId },
 
     #[snafu(display(
         "couldn't create column {} in table {}; limit reached on namespace",
@@ -119,7 +119,7 @@ pub enum Error {
     ))]
     CouldNotRecordSkippedCompaction {
         source: sqlx::Error,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     },
 
     #[snafu(display("could not list skipped compactions: {source}"))]
@@ -477,13 +477,16 @@ pub trait PartitionRepo: Send + Sync {
     ) -> Result<Partition>;
 
     /// get partition by ID
-    async fn get_by_id(&mut self, partition_id: PartitionId) -> Result<Option<Partition>>;
+    async fn get_by_id(
+        &mut self,
+        partition_id: ObjectStorePathPartitionId,
+    ) -> Result<Option<Partition>>;
 
     /// return the partitions by table id
     async fn list_by_table_id(&mut self, table_id: TableId) -> Result<Vec<Partition>>;
 
     /// return all partitions IDs
-    async fn list_ids(&mut self) -> Result<Vec<PartitionId>>;
+    async fn list_ids(&mut self) -> Result<Vec<ObjectStorePathPartitionId>>;
 
     /// Update the sort key for the partition, setting it to `new_sort_key` iff
     /// the current value matches `old_sort_key`.
@@ -498,7 +501,7 @@ pub trait PartitionRepo: Send + Sync {
     /// concurrent writers.
     async fn cas_sort_key(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         old_sort_key: Option<Vec<String>>,
         new_sort_key: &[&str],
     ) -> Result<Partition, CasFailure<Vec<String>>>;
@@ -508,7 +511,7 @@ pub trait PartitionRepo: Send + Sync {
     #[allow(clippy::too_many_arguments)]
     async fn record_skipped_compaction(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         reason: &str,
         num_files: usize,
         limit_num_files: usize,
@@ -520,7 +523,7 @@ pub trait PartitionRepo: Send + Sync {
     /// Get the record of a partition being skipped.
     async fn get_in_skipped_compaction(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Option<SkippedCompaction>>;
 
     /// List the records of compacting a partition being skipped. This is mostly useful for testing.
@@ -529,7 +532,7 @@ pub trait PartitionRepo: Send + Sync {
     /// Delete the records of skipping a partition being compacted.
     async fn delete_skipped_compactions(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Option<SkippedCompaction>>;
 
     /// Return the N most recently created partitions.
@@ -542,7 +545,7 @@ pub trait PartitionRepo: Send + Sync {
         &mut self,
         minimum_time: Timestamp,
         maximum_time: Option<Timestamp>,
-    ) -> Result<Vec<PartitionId>>;
+    ) -> Result<Vec<ObjectStorePathPartitionId>>;
 }
 
 /// Functions for working with parquet file pointers in the catalog
@@ -584,7 +587,7 @@ pub trait ParquetFileRepo: Send + Sync {
     /// [`to_delete`](ParquetFile::to_delete).
     async fn list_by_partition_not_to_delete(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Vec<ParquetFile>>;
 
     /// Update the compaction level of the specified parquet files to
@@ -1663,7 +1666,7 @@ pub(crate) mod test_helpers {
         );
         assert!(repos
             .partitions()
-            .get_by_id(PartitionId::new(i64::MAX))
+            .get_by_id(ObjectStorePathPartitionId::new(i64::MAX))
             .await
             .unwrap()
             .is_none());

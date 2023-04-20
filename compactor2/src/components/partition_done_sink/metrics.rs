@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use metric::{Registry, U64Counter};
 
 use crate::error::{DynError, ErrorKind, ErrorKindExt};
@@ -62,7 +62,7 @@ impl<T> PartitionDoneSink for MetricsPartitionDoneSinkWrapper<T>
 where
     T: PartitionDoneSink,
 {
-    async fn record(&self, partition: PartitionId, res: Result<(), DynError>) {
+    async fn record(&self, partition: ObjectStorePathPartitionId, res: Result<(), DynError>) {
         match &res {
             Ok(()) => {
                 self.ok_counter.inc(1);
@@ -107,14 +107,17 @@ mod tests {
         assert_error_counter(&registry, "unknown", 0);
         assert_error_counter(&registry, "object_store", 0);
 
-        sink.record(PartitionId::new(1), Err("msg 1".into())).await;
-        sink.record(PartitionId::new(2), Err("msg 2".into())).await;
+        sink.record(ObjectStorePathPartitionId::new(1), Err("msg 1".into()))
+            .await;
+        sink.record(ObjectStorePathPartitionId::new(2), Err("msg 2".into()))
+            .await;
         sink.record(
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             Err(Box::new(ObjectStoreError::NotImplemented)),
         )
         .await;
-        sink.record(PartitionId::new(3), Ok(())).await;
+        sink.record(ObjectStorePathPartitionId::new(3), Ok(()))
+            .await;
 
         assert_ok_counter(&registry, 1);
         assert_error_counter(&registry, "unknown", 2);
@@ -124,11 +127,14 @@ mod tests {
             inner.results(),
             HashMap::from([
                 (
-                    PartitionId::new(1),
+                    ObjectStorePathPartitionId::new(1),
                     Err(String::from("Operation not yet implemented.")),
                 ),
-                (PartitionId::new(2), Err(String::from("msg 2"))),
-                (PartitionId::new(3), Ok(())),
+                (
+                    ObjectStorePathPartitionId::new(2),
+                    Err(String::from("msg 2"))
+                ),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
             ]),
         );
     }

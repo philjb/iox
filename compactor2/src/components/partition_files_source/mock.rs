@@ -1,18 +1,18 @@
 use std::{collections::HashMap, fmt::Display};
 
 use async_trait::async_trait;
-use data_types::{ParquetFile, PartitionId};
+use data_types::{ObjectStorePathPartitionId, ParquetFile};
 
 use super::PartitionFilesSource;
 
 #[derive(Debug)]
 pub struct MockPartitionFilesSource {
-    files: HashMap<PartitionId, Vec<ParquetFile>>,
+    files: HashMap<ObjectStorePathPartitionId, Vec<ParquetFile>>,
 }
 
 impl MockPartitionFilesSource {
     #[allow(dead_code)] // not used anywhere
-    pub fn new(files: HashMap<PartitionId, Vec<ParquetFile>>) -> Self {
+    pub fn new(files: HashMap<ObjectStorePathPartitionId, Vec<ParquetFile>>) -> Self {
         Self { files }
     }
 }
@@ -25,7 +25,7 @@ impl Display for MockPartitionFilesSource {
 
 #[async_trait]
 impl PartitionFilesSource for MockPartitionFilesSource {
-    async fn fetch(&self, partition: PartitionId) -> Vec<ParquetFile> {
+    async fn fetch(&self, partition: ObjectStorePathPartitionId) -> Vec<ParquetFile> {
         self.files.get(&partition).cloned().unwrap_or_default()
     }
 }
@@ -51,22 +51,34 @@ mod tests {
         let f_2_1 = ParquetFileBuilder::new(3).with_partition(2).build();
 
         let files = HashMap::from([
-            (PartitionId::new(1), vec![f_1_1.clone(), f_1_2.clone()]),
-            (PartitionId::new(2), vec![f_2_1.clone()]),
+            (
+                ObjectStorePathPartitionId::new(1),
+                vec![f_1_1.clone(), f_1_2.clone()],
+            ),
+            (ObjectStorePathPartitionId::new(2), vec![f_2_1.clone()]),
         ]);
         let source = MockPartitionFilesSource::new(files);
 
         // different partitions
         assert_eq!(
-            source.fetch(PartitionId::new(1)).await,
+            source.fetch(ObjectStorePathPartitionId::new(1)).await,
             vec![f_1_1.clone(), f_1_2.clone()],
         );
-        assert_eq!(source.fetch(PartitionId::new(2)).await, vec![f_2_1],);
+        assert_eq!(
+            source.fetch(ObjectStorePathPartitionId::new(2)).await,
+            vec![f_2_1],
+        );
 
         // fetching does not drain
-        assert_eq!(source.fetch(PartitionId::new(1)).await, vec![f_1_1, f_1_2],);
+        assert_eq!(
+            source.fetch(ObjectStorePathPartitionId::new(1)).await,
+            vec![f_1_1, f_1_2],
+        );
 
         // unknown partition => empty result
-        assert_eq!(source.fetch(PartitionId::new(3)).await, vec![],);
+        assert_eq!(
+            source.fetch(ObjectStorePathPartitionId::new(3)).await,
+            vec![],
+        );
     }
 }

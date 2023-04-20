@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, fmt::Display, sync::Arc};
 
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use futures::{stream::BoxStream, StreamExt};
 
 use crate::components::partitions_source::PartitionsSource;
@@ -39,7 +39,7 @@ impl<T> PartitionStream for EndlessPartititionStream<T>
 where
     T: PartitionsSource,
 {
-    fn stream(&self) -> BoxStream<'_, PartitionId> {
+    fn stream(&self) -> BoxStream<'_, ObjectStorePathPartitionId> {
         let source = Arc::clone(&self.source);
 
         // Note: we use a VecDeque as a buffer so we can preserve the order and cheaply remove the first element without
@@ -76,9 +76,9 @@ mod tests {
     #[tokio::test]
     async fn test_stream() {
         let ids = vec![
-            PartitionId::new(1),
-            PartitionId::new(3),
-            PartitionId::new(2),
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(3),
+            ObjectStorePathPartitionId::new(2),
         ];
         let stream = EndlessPartititionStream::new(MockPartitionsSource::new(ids.clone()));
 
@@ -88,11 +88,11 @@ mod tests {
             assert_eq!(
                 stream.stream().take(5).collect::<Vec<_>>().await,
                 vec![
-                    PartitionId::new(1),
-                    PartitionId::new(3),
-                    PartitionId::new(2),
-                    PartitionId::new(1),
-                    PartitionId::new(3)
+                    ObjectStorePathPartitionId::new(1),
+                    ObjectStorePathPartitionId::new(3),
+                    ObjectStorePathPartitionId::new(2),
+                    ObjectStorePathPartitionId::new(1),
+                    ObjectStorePathPartitionId::new(3)
                 ],
             );
         }

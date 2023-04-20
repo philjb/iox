@@ -98,7 +98,7 @@ impl ParquetFileSink for MockParquetFileSink {
 #[cfg(test)]
 mod tests {
     use arrow_util::assert_batches_eq;
-    use data_types::{NamespaceId, PartitionId, TableId};
+    use data_types::{NamespaceId, ObjectStorePathPartitionId, TableId};
     use datafusion::{
         arrow::{array::new_null_array, datatypes::DataType},
         physical_plan::stream::RecordBatchStreamAdapter,
@@ -170,7 +170,7 @@ mod tests {
                 shard_id: ShardId::new(1),
                 namespace_id: NamespaceId::new(2),
                 table_id: TableId::new(3),
-                partition_id: PartitionId::new(1),
+                partition_id: ObjectStorePathPartitionId::new(1),
                 object_store_id: Uuid::from_u128(2),
                 max_sequence_number: SequenceNumber::new(0),
                 min_time: Timestamp::new(0),
@@ -234,7 +234,7 @@ mod tests {
                 shard_id: ShardId::new(1),
                 namespace_id: NamespaceId::new(2),
                 table_id: TableId::new(3),
-                partition_id: PartitionId::new(1),
+                partition_id: ObjectStorePathPartitionId::new(1),
                 object_store_id: Uuid::from_u128(0),
                 max_sequence_number: SequenceNumber::new(0),
                 min_time: Timestamp::new(0),

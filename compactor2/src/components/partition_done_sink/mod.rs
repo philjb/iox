@@ -4,7 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 
 use crate::error::DynError;
 
@@ -20,7 +20,7 @@ pub trait PartitionDoneSink: Debug + Display + Send + Sync {
     /// Record "partition is done" status for given partition.
     ///
     /// This method should retry.
-    async fn record(&self, partition: PartitionId, res: Result<(), DynError>);
+    async fn record(&self, partition: ObjectStorePathPartitionId, res: Result<(), DynError>);
 }
 
 #[async_trait]
@@ -28,7 +28,7 @@ impl<T> PartitionDoneSink for Arc<T>
 where
     T: PartitionDoneSink + ?Sized,
 {
-    async fn record(&self, partition: PartitionId, res: Result<(), DynError>) {
+    async fn record(&self, partition: ObjectStorePathPartitionId, res: Result<(), DynError>) {
         self.as_ref().record(partition, res).await
     }
 }

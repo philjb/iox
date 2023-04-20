@@ -8,7 +8,9 @@ use std::{
 };
 
 use async_trait::async_trait;
-use data_types::{CompactionLevel, ParquetFile, ParquetFileId, ParquetFileParams, PartitionId};
+use data_types::{
+    CompactionLevel, ObjectStorePathPartitionId, ParquetFile, ParquetFileId, ParquetFileParams,
+};
 use futures::StreamExt;
 use iox_time::{Time, TimeProvider};
 
@@ -54,8 +56,9 @@ use crate::components::{
 /// partition is ever lost. This means that `inner_source` and `inner_sink` can perform proper accounting. The
 /// concurrency of this bypass can be controlled via `bypass_concurrency`.
 ///
-/// This setup relies on a fact that it does not process duplicate [`PartitionId`]. You may use
-/// [`unique_partitions`](crate::components::combos::unique_partitions::unique_partitions) to achieve that.
+/// This setup relies on a fact that it does not process the same partition multiple times. You may
+/// use [`unique_partitions`](crate::components::combos::unique_partitions::unique_partitions) to
+/// achieve that.
 pub fn throttle_partition<T1, T2, T3>(
     source: T1,
     commit: T2,
@@ -101,8 +104,8 @@ struct State {
     //
     // Completed compaction tasks are removed from the map each time the source fetch()
     // is called.
-    in_flight: HashMap<PartitionId, bool>,
-    throttled: HashMap<PartitionId, Time>,
+    in_flight: HashMap<ObjectStorePathPartitionId, bool>,
+    throttled: HashMap<ObjectStorePathPartitionId, Time>,
 }
 
 type SharedState = Arc<Mutex<State>>;
@@ -136,7 +139,7 @@ where
     T1: PartitionsSource,
     T2: PartitionDoneSink,
 {
-    async fn fetch(&self) -> Vec<PartitionId> {
+    async fn fetch(&self) -> Vec<ObjectStorePathPartitionId> {
         let res = self.inner_source.fetch().await;
 
         let (pass, throttle) = {
@@ -213,7 +216,7 @@ where
 {
     async fn commit(
         &self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         delete: &[ParquetFile],
         upgrade: &[ParquetFile],
         create: &[ParquetFileParams],
@@ -268,7 +271,7 @@ where
 {
     async fn record(
         &self,
-        partition: PartitionId,
+        partition: ObjectStorePathPartitionId,
         res: Result<(), Box<dyn std::error::Error + Send + Sync>>,
     ) {
         let known = {
@@ -325,10 +328,10 @@ mod tests {
     #[tokio::test]
     async fn test_throttle() {
         let inner_source = Arc::new(MockPartitionsSource::new(vec![
-            PartitionId::new(1),
-            PartitionId::new(2),
-            PartitionId::new(3),
-            PartitionId::new(4),
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(2),
+            ObjectStorePathPartitionId::new(3),
+            ObjectStorePathPartitionId::new(4),
         ]));
         let inner_commit = Arc::new(MockCommit::new());
         let inner_sink = Arc::new(MockPartitionDoneSink::new());
@@ -347,36 +350,53 @@ mod tests {
         assert_eq!(
             source.fetch().await,
             vec![
-                PartitionId::new(1),
-                PartitionId::new(2),
-                PartitionId::new(3),
-                PartitionId::new(4)
+                ObjectStorePathPartitionId::new(1),
+                ObjectStorePathPartitionId::new(2),
+                ObjectStorePathPartitionId::new(3),
+                ObjectStorePathPartitionId::new(4)
             ],
         );
         assert_eq!(inner_sink.results(), HashMap::from([]),);
 
         // commit
         commit
-            .commit(PartitionId::new(1), &[], &[], &[], CompactionLevel::Initial)
+            .commit(
+                ObjectStorePathPartitionId::new(1),
+                &[],
+                &[],
+                &[],
+                CompactionLevel::Initial,
+            )
             .await;
         commit
-            .commit(PartitionId::new(2), &[], &[], &[], CompactionLevel::Initial)
+            .commit(
+                ObjectStorePathPartitionId::new(2),
+                &[],
+                &[],
+                &[],
+                CompactionLevel::Initial,
+            )
             .await;
 
         // record
-        sink.record(PartitionId::new(1), Ok(())).await;
-        sink.record(PartitionId::new(3), Ok(())).await;
+        sink.record(ObjectStorePathPartitionId::new(1), Ok(()))
+            .await;
+        sink.record(ObjectStorePathPartitionId::new(3), Ok(()))
+            .await;
         assert_eq!(
             inner_sink.results(),
-            HashMap::from([(PartitionId::new(1), Ok(())), (PartitionId::new(3), Ok(())),]),
+            HashMap::from([
+                (ObjectStorePathPartitionId::new(1), Ok(())),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
+            ]),
         );
 
         // ========== Round 2 ==========
         // need to remove partition 2 and 4 because they weren't finished yet
         inner_source.set(vec![
-            PartitionId::new(1),
-            PartitionId::new(3),
-            PartitionId::new(5),
+            ObjectStorePathPartitionId::new(1),
+            ObjectStorePathPartitionId::new(3),
+            ObjectStorePathPartitionId::new(5),
         ]);
 
         // fetch
@@ -384,54 +404,72 @@ mod tests {
             source.fetch().await,
             vec![
                 // ID 1: commit in last round => pass
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 // ID 3: no commit in last round => throttled
                 // ID 5: new => pass
-                PartitionId::new(5),
+                ObjectStorePathPartitionId::new(5),
             ],
         );
         assert_eq!(
             inner_sink.results(),
-            HashMap::from([(PartitionId::new(1), Ok(())), (PartitionId::new(3), Ok(())),]),
+            HashMap::from([
+                (ObjectStorePathPartitionId::new(1), Ok(())),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
+            ]),
         );
 
         // ========== Round 3 ==========
         // advance time to "unthrottle" ID 3
-        inner_source.set(vec![PartitionId::new(3)]);
+        inner_source.set(vec![ObjectStorePathPartitionId::new(3)]);
         time_provider.inc(Duration::from_secs(1));
 
         // fetch
-        assert_eq!(source.fetch().await, vec![PartitionId::new(3)],);
+        assert_eq!(
+            source.fetch().await,
+            vec![ObjectStorePathPartitionId::new(3)],
+        );
 
         // record
         // can still finish partition 2 and 4
-        sink.record(PartitionId::new(2), Err(String::from("foo").into()))
-            .await;
-        sink.record(PartitionId::new(4), Err(String::from("bar").into()))
-            .await;
+        sink.record(
+            ObjectStorePathPartitionId::new(2),
+            Err(String::from("foo").into()),
+        )
+        .await;
+        sink.record(
+            ObjectStorePathPartitionId::new(4),
+            Err(String::from("bar").into()),
+        )
+        .await;
         assert_eq!(
             inner_sink.results(),
             HashMap::from([
-                (PartitionId::new(1), Ok(())),
-                (PartitionId::new(2), Err(String::from("foo"))),
-                (PartitionId::new(3), Ok(())),
-                (PartitionId::new(4), Err(String::from("bar"))),
+                (ObjectStorePathPartitionId::new(1), Ok(())),
+                (ObjectStorePathPartitionId::new(2), Err(String::from("foo"))),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
+                (ObjectStorePathPartitionId::new(4), Err(String::from("bar"))),
             ]),
         );
 
         // ========== Round 4 ==========
-        inner_source.set(vec![PartitionId::new(2), PartitionId::new(4)]);
+        inner_source.set(vec![
+            ObjectStorePathPartitionId::new(2),
+            ObjectStorePathPartitionId::new(4),
+        ]);
 
         // fetch
-        assert_eq!(source.fetch().await, vec![PartitionId::new(2)],);
+        assert_eq!(
+            source.fetch().await,
+            vec![ObjectStorePathPartitionId::new(2)],
+        );
 
         assert_eq!(
             inner_sink.results(),
             HashMap::from([
-                (PartitionId::new(1), Ok(())),
-                (PartitionId::new(2), Err(String::from("foo"))),
-                (PartitionId::new(3), Ok(())),
-                (PartitionId::new(4), Ok(())),
+                (ObjectStorePathPartitionId::new(1), Ok(())),
+                (ObjectStorePathPartitionId::new(2), Err(String::from("foo"))),
+                (ObjectStorePathPartitionId::new(3), Ok(())),
+                (ObjectStorePathPartitionId::new(4), Ok(())),
             ]),
         );
 
@@ -440,14 +478,14 @@ mod tests {
             inner_commit.history(),
             vec![
                 CommitHistoryEntry {
-                    partition_id: PartitionId::new(1),
+                    partition_id: ObjectStorePathPartitionId::new(1),
                     delete: vec![],
                     upgrade: vec![],
                     created: vec![],
                     target_level: CompactionLevel::Initial,
                 },
                 CommitHistoryEntry {
-                    partition_id: PartitionId::new(2),
+                    partition_id: ObjectStorePathPartitionId::new(2),
                     delete: vec![],
                     upgrade: vec![],
                     created: vec![],
@@ -461,7 +499,7 @@ mod tests {
     #[should_panic(expected = "Unknown or already done partition in commit: 1")]
     async fn test_panic_commit_unknown() {
         let (source, commit, sink) = throttle_partition(
-            MockPartitionsSource::new(vec![PartitionId::new(1)]),
+            MockPartitionsSource::new(vec![ObjectStorePathPartitionId::new(1)]),
             MockCommit::new(),
             MockPartitionDoneSink::new(),
             Arc::new(MockProvider::new(Time::MIN)),
@@ -470,9 +508,16 @@ mod tests {
         );
 
         source.fetch().await;
-        sink.record(PartitionId::new(1), Ok(())).await;
+        sink.record(ObjectStorePathPartitionId::new(1), Ok(()))
+            .await;
         commit
-            .commit(PartitionId::new(1), &[], &[], &[], CompactionLevel::Initial)
+            .commit(
+                ObjectStorePathPartitionId::new(1),
+                &[],
+                &[],
+                &[],
+                CompactionLevel::Initial,
+            )
             .await;
     }
 
@@ -480,7 +525,7 @@ mod tests {
     #[should_panic(expected = "Unknown or already done partition in partition done sink: 1")]
     async fn test_panic_sink_unknown() {
         let (source, _commit, sink) = throttle_partition(
-            MockPartitionsSource::new(vec![PartitionId::new(1)]),
+            MockPartitionsSource::new(vec![ObjectStorePathPartitionId::new(1)]),
             MockCommit::new(),
             MockPartitionDoneSink::new(),
             Arc::new(MockProvider::new(Time::MIN)),
@@ -489,15 +534,17 @@ mod tests {
         );
 
         source.fetch().await;
-        sink.record(PartitionId::new(1), Ok(())).await;
-        sink.record(PartitionId::new(1), Ok(())).await;
+        sink.record(ObjectStorePathPartitionId::new(1), Ok(()))
+            .await;
+        sink.record(ObjectStorePathPartitionId::new(1), Ok(()))
+            .await;
     }
 
     #[tokio::test]
     #[should_panic(expected = "Partition already in-flight: 1")]
     async fn test_panic_duplicate_in_flight() {
         let (source, _commit, _sink) = throttle_partition(
-            MockPartitionsSource::new(vec![PartitionId::new(1)]),
+            MockPartitionsSource::new(vec![ObjectStorePathPartitionId::new(1)]),
             MockCommit::new(),
             MockPartitionDoneSink::new(),
             Arc::new(MockProvider::new(Time::MIN)),

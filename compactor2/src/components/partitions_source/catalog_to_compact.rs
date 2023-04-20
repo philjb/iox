@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use backoff::{Backoff, BackoffConfig};
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use iox_catalog::interface::Catalog;
 use iox_time::TimeProvider;
 
@@ -52,7 +52,7 @@ impl Display for CatalogToCompactPartitionsSource {
 
 #[async_trait]
 impl PartitionsSource for CatalogToCompactPartitionsSource {
-    async fn fetch(&self) -> Vec<PartitionId> {
+    async fn fetch(&self) -> Vec<ObjectStorePathPartitionId> {
         let minimum_time = self.time_provider.now() - self.min_threshold;
         let maximum_time = self.max_threshold.map(|max| self.time_provider.now() - max);
 
@@ -77,8 +77,11 @@ mod tests {
     use iox_catalog::mem::MemCatalog;
     use iox_tests::PartitionBuilder;
 
-    fn partition_ids(ids: &[i64]) -> Vec<PartitionId> {
-        ids.iter().cloned().map(PartitionId::new).collect()
+    fn partition_ids(ids: &[i64]) -> Vec<ObjectStorePathPartitionId> {
+        ids.iter()
+            .cloned()
+            .map(ObjectStorePathPartitionId::new)
+            .collect()
     }
 
     async fn fetch_test(

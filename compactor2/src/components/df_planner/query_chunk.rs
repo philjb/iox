@@ -1,7 +1,7 @@
 //! QueryableParquetChunk for building query plan
 use std::{any::Any, sync::Arc};
 
-use data_types::{ChunkId, ChunkOrder, DeletePredicate, PartitionId, TableSummary};
+use data_types::{ChunkId, ChunkOrder, DeletePredicate, ObjectStorePathPartitionId, TableSummary};
 use datafusion::error::DataFusionError;
 use iox_query::{
     exec::{stringset::StringSet, IOxSessionContext},
@@ -23,7 +23,7 @@ pub struct QueryableParquetChunk {
     data: Arc<ParquetChunk>,
     // We do not yet support delete but we need this to work with the straight QueryChunkMeta
     delete_predicates: Vec<Arc<DeletePredicate>>,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     sort_key: Option<SortKey>,
     partition_sort_key: Option<SortKey>,
     order: ChunkOrder,
@@ -34,7 +34,7 @@ impl QueryableParquetChunk {
     /// Initialize a QueryableParquetChunk
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         data: Arc<ParquetChunk>,
         sort_key: Option<SortKey>,
         partition_sort_key: Option<SortKey>,
@@ -84,7 +84,7 @@ impl QueryChunkMeta for QueryableParquetChunk {
         self.partition_sort_key.as_ref()
     }
 
-    fn partition_id(&self) -> PartitionId {
+    fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 

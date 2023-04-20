@@ -132,7 +132,9 @@ mod tests {
     use std::{future::ready, sync::Arc, task::Poll};
 
     use assert_matches::assert_matches;
-    use data_types::{NamespaceId, PartitionId, PartitionKey, SequenceNumber, ShardId, TableId};
+    use data_types::{
+        NamespaceId, ObjectStorePathPartitionId, PartitionKey, SequenceNumber, ShardId, TableId,
+    };
     use futures::FutureExt;
     use lazy_static::lazy_static;
     use mutable_batch_lp::test_helpers::lp_to_mutable_batch;
@@ -150,7 +152,7 @@ mod tests {
 
     use super::*;
 
-    const PARTITION_ID: PartitionId = PartitionId::new(1);
+    const PARTITION_ID: ObjectStorePathPartitionId = ObjectStorePathPartitionId::new(1);
     const TRANSITION_SHARD_ID: ShardId = ShardId::new(84);
 
     lazy_static! {

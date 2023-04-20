@@ -6,7 +6,7 @@ use arrow_flight::{
     FlightData, FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, IpcMessage,
     PutResult, SchemaResult, Ticket,
 };
-use data_types::{NamespaceId, PartitionId, TableId};
+use data_types::{NamespaceId, ObjectStorePathPartitionId, TableId};
 use flatbuffers::FlatBufferBuilder;
 use futures::{Stream, StreamExt, TryStreamExt};
 use generated_types::influxdata::iox::ingester::v1::{self as proto, PartitionStatus};
@@ -258,7 +258,7 @@ where
 /// Encode the partition information as a None flight data with meatadata
 fn encode_partition(
     // Partition ID.
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     // Partition persistence status.
     status: PartitionStatus,
     // Count of persisted Parquet files for the [`PartitionData`] instance this

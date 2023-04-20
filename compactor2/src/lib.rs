@@ -130,14 +130,14 @@
 //! ```
 //! # use std::fmt::{Debug, Display};
 //! # use async_trait::async_trait;
-//! # use data_types::{Partition, PartitionId};
+//! # use data_types::{Partition, ObjectStorePathPartitionId};
 //! /// Fetches partition info.
 //! #[async_trait]
 //! pub trait PartitionSource: Debug + Display + Send + Sync {
 //!     /// Fetches partition info.
 //!     ///
 //!     /// This method retries internally.
-//!     async fn fetch(&self, id: PartitionId) -> Partition;
+//!     async fn fetch(&self, id: ObjectStorePathPartitionId) -> Partition;
 //! }
 //! ```
 //!

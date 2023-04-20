@@ -262,7 +262,7 @@ where
 mod tests {
     use std::{sync::Arc, time::Duration};
 
-    use data_types::PartitionId;
+    use data_types::ObjectStorePathPartitionId;
     use mutable_batch_lp::lines_to_batches;
 
     use super::*;
@@ -275,7 +275,7 @@ mod tests {
     const TABLE_ID: TableId = TableId::new(44);
     const NAMESPACE_ID: NamespaceId = NamespaceId::new(42);
     const PARTITION_KEY: &str = "platanos";
-    const PARTITION_ID: PartitionId = PartitionId::new(0);
+    const PARTITION_ID: ObjectStorePathPartitionId = ObjectStorePathPartitionId::new(0);
     const TRANSITION_SHARD_ID: ShardId = ShardId::new(84);
 
     #[tokio::test]

@@ -1,18 +1,20 @@
 use std::{collections::HashMap, fmt::Display};
 
 use async_trait::async_trait;
-use data_types::{PartitionId, SkippedCompaction};
+use data_types::{ObjectStorePathPartitionId, SkippedCompaction};
 
 use super::SkippedCompactionsSource;
 
 #[derive(Debug)]
 pub struct MockSkippedCompactionsSource {
-    skipped_compactions: HashMap<PartitionId, SkippedCompaction>,
+    skipped_compactions: HashMap<ObjectStorePathPartitionId, SkippedCompaction>,
 }
 
 impl MockSkippedCompactionsSource {
     #[allow(dead_code)] // not used anywhere
-    pub fn new(skipped_compactions: HashMap<PartitionId, SkippedCompaction>) -> Self {
+    pub fn new(
+        skipped_compactions: HashMap<ObjectStorePathPartitionId, SkippedCompaction>,
+    ) -> Self {
         Self {
             skipped_compactions,
         }
@@ -27,7 +29,7 @@ impl Display for MockSkippedCompactionsSource {
 
 #[async_trait]
 impl SkippedCompactionsSource for MockSkippedCompactionsSource {
-    async fn fetch(&self, partition: PartitionId) -> Option<SkippedCompaction> {
+    async fn fetch(&self, partition: ObjectStorePathPartitionId) -> Option<SkippedCompaction> {
         self.skipped_compactions.get(&partition).cloned()
     }
 }
@@ -56,19 +58,28 @@ mod tests {
             .build();
 
         let scs = HashMap::from([
-            (PartitionId::new(1), sc_1.clone()),
-            (PartitionId::new(2), sc_2.clone()),
+            (ObjectStorePathPartitionId::new(1), sc_1.clone()),
+            (ObjectStorePathPartitionId::new(2), sc_2.clone()),
         ]);
         let source = MockSkippedCompactionsSource::new(scs);
 
         // different tables
-        assert_eq!(source.fetch(PartitionId::new(1)).await, Some(sc_1.clone()),);
-        assert_eq!(source.fetch(PartitionId::new(2)).await, Some(sc_2),);
+        assert_eq!(
+            source.fetch(ObjectStorePathPartitionId::new(1)).await,
+            Some(sc_1.clone()),
+        );
+        assert_eq!(
+            source.fetch(ObjectStorePathPartitionId::new(2)).await,
+            Some(sc_2),
+        );
 
         // fetching does not drain
-        assert_eq!(source.fetch(PartitionId::new(1)).await, Some(sc_1),);
+        assert_eq!(
+            source.fetch(ObjectStorePathPartitionId::new(1)).await,
+            Some(sc_1),
+        );
 
         // unknown partition => None result
-        assert_eq!(source.fetch(PartitionId::new(3)).await, None);
+        assert_eq!(source.fetch(ObjectStorePathPartitionId::new(3)).await, None);
     }
 }

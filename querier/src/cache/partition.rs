@@ -11,7 +11,7 @@ use cache_system::{
     loader::{metrics::MetricsLoader, FunctionLoader},
     resource_consumption::FunctionEstimator,
 };
-use data_types::{ColumnId, PartitionId, ShardId};
+use data_types::{ColumnId, ObjectStorePathPartitionId, ShardId};
 use iox_catalog::interface::Catalog;
 use iox_time::TimeProvider;
 use schema::sort::SortKey;
@@ -28,7 +28,7 @@ const CACHE_ID: &str = "partition";
 
 type CacheT = Box<
     dyn Cache<
-        K = PartitionId,
+        K = ObjectStorePathPartitionId,
         V = Option<CachedPartition>,
         GetExtra = (Arc<CachedTable>, Option<Span>),
         PeekExtra = ((), Option<Span>),
@@ -39,7 +39,7 @@ type CacheT = Box<
 #[derive(Debug)]
 pub struct PartitionCache {
     cache: CacheT,
-    remove_if_handle: RemoveIfHandle<PartitionId, Option<CachedPartition>>,
+    remove_if_handle: RemoveIfHandle<ObjectStorePathPartitionId, Option<CachedPartition>>,
 }
 
 impl PartitionCache {
@@ -52,8 +52,8 @@ impl PartitionCache {
         ram_pool: Arc<ResourcePool<RamSize>>,
         testing: bool,
     ) -> Self {
-        let loader =
-            FunctionLoader::new(move |partition_id: PartitionId, extra: Arc<CachedTable>| {
+        let loader = FunctionLoader::new(
+            move |partition_id: ObjectStorePathPartitionId, extra: Arc<CachedTable>| {
                 let catalog = Arc::clone(&catalog);
                 let backoff_config = backoff_config.clone();
 
@@ -79,7 +79,8 @@ impl PartitionCache {
                         sort_key,
                     })
                 }
-            });
+            },
+        );
         let loader = Arc::new(MetricsLoader::new(
             loader,
             CACHE_ID,
@@ -122,7 +123,7 @@ impl PartitionCache {
     pub async fn shard_id(
         &self,
         cached_table: Arc<CachedTable>,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         span: Option<Span>,
     ) -> Option<ShardId> {
         self.cache
@@ -137,7 +138,7 @@ impl PartitionCache {
     pub async fn sort_key(
         &self,
         cached_table: Arc<CachedTable>,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         should_cover: &[ColumnId],
         span: Option<Span>,
     ) -> Option<Arc<PartitionSortKey>> {
@@ -288,7 +289,11 @@ mod tests {
         // non-existing partition
         for _ in 0..2 {
             let res = cache
-                .shard_id(Arc::clone(&cached_table), PartitionId::new(i64::MAX), None)
+                .shard_id(
+                    Arc::clone(&cached_table),
+                    ObjectStorePathPartitionId::new(i64::MAX),
+                    None,
+                )
                 .await;
             assert_eq!(res, None);
             assert_histogram_metric_count(&catalog.metric_registry, "partition_get_by_id", 3);
@@ -373,7 +378,7 @@ mod tests {
             let res = cache
                 .sort_key(
                     Arc::clone(&cached_table),
-                    PartitionId::new(i64::MAX),
+                    ObjectStorePathPartitionId::new(i64::MAX),
                     &Vec::new(),
                     None,
                 )

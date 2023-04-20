@@ -4,7 +4,9 @@ use std::{
 };
 
 use async_trait::async_trait;
-use data_types::{CompactionLevel, ParquetFile, ParquetFileId, ParquetFileParams, PartitionId};
+use data_types::{
+    CompactionLevel, ObjectStorePathPartitionId, ParquetFile, ParquetFileId, ParquetFileParams,
+};
 
 pub mod catalog;
 pub mod logging;
@@ -22,7 +24,7 @@ pub trait Commit: Debug + Display + Send + Sync {
     /// visible. Commits are always all-or-nothing.
     async fn commit(
         &self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         delete: &[ParquetFile],
         upgrade: &[ParquetFile],
         create: &[ParquetFileParams],
@@ -45,7 +47,7 @@ where
 {
     async fn commit(
         &self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         delete: &[ParquetFile],
         upgrade: &[ParquetFile],
         create: &[ParquetFileParams],

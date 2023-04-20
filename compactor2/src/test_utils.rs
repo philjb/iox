@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use data_types::{
-    ColumnId, ColumnSchema, ColumnType, NamespaceId, PartitionId, PartitionKey, Table, TableId,
-    TableSchema,
+    ColumnId, ColumnSchema, ColumnType, NamespaceId, ObjectStorePathPartitionId, PartitionKey,
+    Table, TableId, TableSchema,
 };
 
 use crate::PartitionInfo;
@@ -13,7 +13,7 @@ pub struct PartitionInfoBuilder {
 
 impl PartitionInfoBuilder {
     pub fn new() -> Self {
-        let partition_id = PartitionId::new(1);
+        let partition_id = ObjectStorePathPartitionId::new(1);
         let namespace_id = NamespaceId::new(2);
         let table_id = TableId::new(3);
 
@@ -38,7 +38,7 @@ impl PartitionInfoBuilder {
     }
 
     pub fn with_partition_id(mut self, id: i64) -> Self {
-        self.inner.partition_id = PartitionId::new(id);
+        self.inner.partition_id = ObjectStorePathPartitionId::new(id);
         self
     }
 

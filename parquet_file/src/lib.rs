@@ -21,7 +21,8 @@ pub mod serialize;
 pub mod storage;
 
 use data_types::{
-    NamespaceId, ParquetFile, ParquetFileParams, PartitionId, ShardId, TableId, TRANSITION_SHARD_ID,
+    NamespaceId, ObjectStorePathPartitionId, ParquetFile, ParquetFileParams, ShardId, TableId,
+    TRANSITION_SHARD_ID,
 };
 use object_store::path::Path;
 use uuid::Uuid;
@@ -33,7 +34,7 @@ pub struct ParquetFilePath {
     namespace_id: NamespaceId,
     table_id: TableId,
     shard_id: ShardId,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     object_store_id: Uuid,
 }
 
@@ -43,7 +44,7 @@ impl ParquetFilePath {
         namespace_id: NamespaceId,
         table_id: TableId,
         shard_id: ShardId,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         object_store_id: Uuid,
     ) -> Self {
         Self {
@@ -148,7 +149,7 @@ mod tests {
             NamespaceId::new(1),
             TableId::new(2),
             ShardId::new(3),
-            PartitionId::new(4),
+            ObjectStorePathPartitionId::new(4),
             Uuid::nil(),
         );
         let path = pfp.object_store_path();
@@ -164,7 +165,7 @@ mod tests {
             NamespaceId::new(1),
             TableId::new(2),
             TRANSITION_SHARD_ID,
-            PartitionId::new(4),
+            ObjectStorePathPartitionId::new(4),
             Uuid::nil(),
         );
         let path = pfp.object_store_path();

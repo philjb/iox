@@ -1,7 +1,7 @@
 use std::{fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 
 use crate::{
     components::{
@@ -63,7 +63,10 @@ where
     T: TablesSource,
     N: NamespacesSource,
 {
-    async fn fetch(&self, partition_id: PartitionId) -> Result<Arc<PartitionInfo>, DynError> {
+    async fn fetch(
+        &self,
+        partition_id: ObjectStorePathPartitionId,
+    ) -> Result<Arc<PartitionInfo>, DynError> {
         // Get info for the partition
         let partition = self
             .partition_source

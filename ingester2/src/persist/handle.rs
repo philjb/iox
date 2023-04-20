@@ -472,7 +472,7 @@ mod tests {
     use std::{sync::Arc, task::Poll, time::Duration};
 
     use assert_matches::assert_matches;
-    use data_types::{NamespaceId, PartitionId, PartitionKey, ShardId, TableId};
+    use data_types::{NamespaceId, ObjectStorePathPartitionId, PartitionKey, ShardId, TableId};
     use dml::DmlOperation;
     use futures::Future;
     use iox_catalog::mem::MemCatalog;
@@ -502,7 +502,7 @@ mod tests {
         test_util::make_write_op,
     };
 
-    const PARTITION_ID: PartitionId = PartitionId::new(42);
+    const PARTITION_ID: ObjectStorePathPartitionId = ObjectStorePathPartitionId::new(42);
     const NAMESPACE_ID: NamespaceId = NamespaceId::new(24);
     const TABLE_ID: TableId = TableId::new(2442);
     const TABLE_NAME: &str = "banana-report";
@@ -525,7 +525,7 @@ mod tests {
     /// Construct a partition with the above constants, with the given sort key,
     /// and containing a single write.
     async fn new_partition(
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         sort_key: SortKeyState,
     ) -> Arc<Mutex<PartitionData>> {
         let buffer_tree = BufferTree::new(

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use sharder::JumpHash;
 
 use super::IdOnlyPartitionFilter;
@@ -29,7 +29,7 @@ impl Display for ShardPartitionFilter {
 }
 
 impl IdOnlyPartitionFilter for ShardPartitionFilter {
-    fn apply(&self, partition_id: PartitionId) -> bool {
+    fn apply(&self, partition_id: ObjectStorePathPartitionId) -> bool {
         *self.jump_hash.hash(partition_id) == self.shard_id
     }
 }
@@ -57,7 +57,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         for pid in 0..100 {
-            let pid = PartitionId::new(pid);
+            let pid = ObjectStorePathPartitionId::new(pid);
 
             let mut hit = false;
             for (filter, counter) in &mut filters {

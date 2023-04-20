@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
 use backoff::{Backoff, BackoffConfig};
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use iox_catalog::interface::Catalog;
 
 use super::PartitionsSource;
@@ -31,7 +31,7 @@ impl Display for CatalogAllPartitionsSource {
 
 #[async_trait]
 impl PartitionsSource for CatalogAllPartitionsSource {
-    async fn fetch(&self) -> Vec<PartitionId> {
+    async fn fetch(&self) -> Vec<ObjectStorePathPartitionId> {
         Backoff::new(&self.backoff_config)
             .retry_all_errors("list_ids", || async {
                 self.catalog

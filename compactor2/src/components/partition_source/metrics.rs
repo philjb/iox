@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use data_types::{Partition, PartitionId};
+use data_types::{ObjectStorePathPartitionId, Partition};
 use metric::{Registry, U64Counter};
 
 use super::PartitionSource;
@@ -52,7 +52,7 @@ impl<T> PartitionSource for MetricsPartitionSourceWrapper<T>
 where
     T: PartitionSource,
 {
-    async fn fetch_by_id(&self, partition_id: PartitionId) -> Option<Partition> {
+    async fn fetch_by_id(&self, partition_id: ObjectStorePathPartitionId) -> Option<Partition> {
         let res = self.inner.fetch_by_id(partition_id).await;
         match res {
             Some(_) => self.fetch_found_counter.inc(1),
@@ -92,11 +92,17 @@ mod tests {
         assert_fetch_notfound_counter(&registry, 0);
 
         assert_eq!(
-            source.fetch_by_id(PartitionId::new(5)).await,
+            source.fetch_by_id(ObjectStorePathPartitionId::new(5)).await,
             Some(p.clone())
         );
-        assert_eq!(source.fetch_by_id(PartitionId::new(5)).await, Some(p));
-        assert_eq!(source.fetch_by_id(PartitionId::new(1)).await, None);
+        assert_eq!(
+            source.fetch_by_id(ObjectStorePathPartitionId::new(5)).await,
+            Some(p)
+        );
+        assert_eq!(
+            source.fetch_by_id(ObjectStorePathPartitionId::new(1)).await,
+            None
+        );
 
         assert_fetch_found_counter(&registry, 2);
         assert_fetch_notfound_counter(&registry, 1);

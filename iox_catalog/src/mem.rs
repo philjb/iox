@@ -12,10 +12,10 @@ use crate::{
 };
 use async_trait::async_trait;
 use data_types::{
-    Column, ColumnId, ColumnType, CompactionLevel, Namespace, NamespaceId, ParquetFile,
-    ParquetFileId, ParquetFileParams, Partition, PartitionId, PartitionKey, QueryPool, QueryPoolId,
-    SequenceNumber, Shard, ShardId, ShardIndex, SkippedCompaction, Table, TableId, Timestamp,
-    TopicId, TopicMetadata,
+    Column, ColumnId, ColumnType, CompactionLevel, Namespace, NamespaceId,
+    ObjectStorePathPartitionId, ParquetFile, ParquetFileId, ParquetFileParams, Partition,
+    PartitionKey, QueryPool, QueryPoolId, SequenceNumber, Shard, ShardId, ShardIndex,
+    SkippedCompaction, Table, TableId, Timestamp, TopicId, TopicMetadata,
 };
 use iox_time::{SystemProvider, TimeProvider};
 use observability_deps::tracing::warn;
@@ -754,7 +754,7 @@ impl PartitionRepo for MemTxn {
                 Some(p) => p,
                 None => {
                     let p = Partition::new(
-                        PartitionId::new(stage.partitions.len() as i64 + 1),
+                        ObjectStorePathPartitionId::new(stage.partitions.len() as i64 + 1),
                         shard_id,
                         table_id,
                         key,
@@ -770,7 +770,10 @@ impl PartitionRepo for MemTxn {
         Ok(partition.clone())
     }
 
-    async fn get_by_id(&mut self, partition_id: PartitionId) -> Result<Option<Partition>> {
+    async fn get_by_id(
+        &mut self,
+        partition_id: ObjectStorePathPartitionId,
+    ) -> Result<Option<Partition>> {
         let stage = self.stage();
 
         Ok(stage
@@ -792,7 +795,7 @@ impl PartitionRepo for MemTxn {
         Ok(partitions)
     }
 
-    async fn list_ids(&mut self) -> Result<Vec<PartitionId>> {
+    async fn list_ids(&mut self) -> Result<Vec<ObjectStorePathPartitionId>> {
         let stage = self.stage();
 
         let partitions: Vec<_> = stage.partitions.iter().map(|p| p.id).collect();
@@ -802,7 +805,7 @@ impl PartitionRepo for MemTxn {
 
     async fn cas_sort_key(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         old_sort_key: Option<Vec<String>>,
         new_sort_key: &[&str],
     ) -> Result<Partition, CasFailure<Vec<String>>> {
@@ -822,7 +825,7 @@ impl PartitionRepo for MemTxn {
 
     async fn record_skipped_compaction(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         reason: &str,
         num_files: usize,
         limit_num_files: usize,
@@ -864,7 +867,7 @@ impl PartitionRepo for MemTxn {
 
     async fn get_in_skipped_compaction(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Option<SkippedCompaction>> {
         let stage = self.stage();
         Ok(stage
@@ -881,7 +884,7 @@ impl PartitionRepo for MemTxn {
 
     async fn delete_skipped_compactions(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Option<SkippedCompaction>> {
         use std::mem;
 
@@ -908,7 +911,7 @@ impl PartitionRepo for MemTxn {
         &mut self,
         minimum_time: Timestamp,
         maximum_time: Option<Timestamp>,
-    ) -> Result<Vec<PartitionId>> {
+    ) -> Result<Vec<ObjectStorePathPartitionId>> {
         let stage = self.stage();
 
         let partitions: Vec<_> = stage
@@ -1066,7 +1069,7 @@ impl ParquetFileRepo for MemTxn {
 
     async fn list_by_partition_not_to_delete(
         &mut self,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
     ) -> Result<Vec<ParquetFile>> {
         let stage = self.stage();
 

@@ -13,8 +13,8 @@ use async_trait::async_trait;
 use backoff::{Backoff, BackoffConfig, BackoffError};
 use client_util::connection;
 use data_types::{
-    ChunkId, ChunkOrder, DeletePredicate, NamespaceId, PartitionId, SequenceNumber, ShardId,
-    ShardIndex, TableSummary, TimestampMinMax,
+    ChunkId, ChunkOrder, DeletePredicate, NamespaceId, ObjectStorePathPartitionId, SequenceNumber,
+    ShardId, ShardIndex, TableSummary, TimestampMinMax,
 };
 use datafusion::error::DataFusionError;
 use futures::{stream::FuturesUnordered, TryStreamExt};
@@ -109,7 +109,7 @@ pub enum Error {
         "Partition status missing for partition {partition_id}, ingestger: {ingester_address}"
     ))]
     PartitionStatusMissing {
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         ingester_address: String,
     },
 
@@ -123,7 +123,7 @@ pub enum Error {
         "Duplicate partition info for partition {partition_id}, ingestger: {ingester_address}"
     ))]
     DuplicatePartitionInfo {
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         ingester_address: String,
     },
 
@@ -536,7 +536,7 @@ impl CurrentPartition {
 /// This should be used AFTER the stream was drained because we will perform some catalog IO and
 /// this should likely not block the ingester.
 struct IngesterStreamDecoder {
-    finished_partitions: HashMap<PartitionId, IngesterPartition>,
+    finished_partitions: HashMap<ObjectStorePathPartitionId, IngesterPartition>,
     current_partition: CurrentPartition,
     current_chunk: Option<(Schema, Vec<RecordBatch>)>,
     ingester_address: Arc<str>,
@@ -636,7 +636,7 @@ impl IngesterStreamDecoder {
                 // new partition announced
                 self.flush_partition().await?;
 
-                let partition_id = PartitionId::new(md.partition_id);
+                let partition_id = ObjectStorePathPartitionId::new(md.partition_id);
                 let status = md.status.context(PartitionStatusMissingSnafu {
                     partition_id,
                     ingester_address: self.ingester_address.as_ref(),
@@ -886,7 +886,7 @@ pub struct IngesterPartition {
     /// be removed.
     ingester_uuid: Option<Uuid>,
 
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     shard_id: ShardId,
 
     /// If using ingester2/rpc write path, this will be the number of Parquet files this ingester
@@ -909,7 +909,7 @@ impl IngesterPartition {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         ingester_uuid: Option<Uuid>,
-        partition_id: PartitionId,
+        partition_id: ObjectStorePathPartitionId,
         shard_id: ShardId,
         completed_persistence_count: u64,
         parquet_max_sequence_number: Option<SequenceNumber>,
@@ -992,7 +992,7 @@ impl IngesterPartition {
         self.ingester_uuid
     }
 
-    pub(crate) fn partition_id(&self) -> PartitionId {
+    pub(crate) fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 
@@ -1037,7 +1037,7 @@ impl IngesterPartition {
 #[derive(Debug, Clone)]
 pub struct IngesterChunk {
     chunk_id: ChunkId,
-    partition_id: PartitionId,
+    partition_id: ObjectStorePathPartitionId,
     schema: Schema,
 
     /// Partition-wide sort key.
@@ -1106,7 +1106,7 @@ impl QueryChunkMeta for IngesterChunk {
         self.partition_sort_key.as_ref().map(|sk| sk.as_ref())
     }
 
-    fn partition_id(&self) -> PartitionId {
+    fn partition_id(&self) -> ObjectStorePathPartitionId {
         self.partition_id
     }
 
@@ -2044,7 +2044,7 @@ mod tests {
             // Construct a partition and ensure it doesn't error
             let ingester_partition = IngesterPartition::new(
                 Some(ingester_uuid),
-                PartitionId::new(1),
+                ObjectStorePathPartitionId::new(1),
                 ShardId::new(1),
                 0,
                 parquet_max_sequence_number,
@@ -2074,7 +2074,7 @@ mod tests {
         let parquet_max_sequence_number = None;
         let err = IngesterPartition::new(
             Some(ingester_uuid),
-            PartitionId::new(1),
+            ObjectStorePathPartitionId::new(1),
             ShardId::new(1),
             0,
             parquet_max_sequence_number,

@@ -1,7 +1,7 @@
 use std::{fmt::Display, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use data_types::PartitionId;
+use data_types::ObjectStorePathPartitionId;
 use iox_time::TimeProvider;
 
 use super::PartitionsSource;
@@ -43,7 +43,7 @@ impl<T> PartitionsSource for NotEmptyPartitionsSourceWrapper<T>
 where
     T: PartitionsSource,
 {
-    async fn fetch(&self) -> Vec<PartitionId> {
+    async fn fetch(&self) -> Vec<ObjectStorePathPartitionId> {
         loop {
             let res = self.inner.fetch().await;
             if !res.is_empty() {
@@ -92,7 +92,7 @@ mod tests {
         fut.assert_pending().await;
 
         // insert data but system is still throttled
-        let p = PartitionId::new(5);
+        let p = ObjectStorePathPartitionId::new(5);
         let parts = vec![p];
         inner.set(parts.clone());
         fut.assert_pending().await;

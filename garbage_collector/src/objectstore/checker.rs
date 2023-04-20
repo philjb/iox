@@ -137,8 +137,8 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
     use data_types::{
-        ColumnId, ColumnSet, CompactionLevel, NamespaceId, ParquetFile, ParquetFileParams,
-        PartitionId, SequenceNumber, ShardId, ShardIndex, TableId, Timestamp,
+        ColumnId, ColumnSet, CompactionLevel, NamespaceId, ObjectStorePathPartitionId, ParquetFile,
+        ParquetFileParams, SequenceNumber, ShardId, ShardIndex, TableId, Timestamp,
     };
     use iox_catalog::{interface::Catalog, mem::MemCatalog};
     use object_store::path::Path;
@@ -242,7 +242,7 @@ mod tests {
             NamespaceId::new(1),
             TableId::new(2),
             ShardId::new(3),
-            PartitionId::new(4),
+            ObjectStorePathPartitionId::new(4),
             Uuid::new_v4(),
         )
         .object_store_path();
@@ -316,7 +316,7 @@ mod tests {
             NamespaceId::new(1),
             TableId::new(2),
             ShardId::new(3),
-            PartitionId::new(4),
+            ObjectStorePathPartitionId::new(4),
             Uuid::new_v4(),
         )
         .object_store_path();

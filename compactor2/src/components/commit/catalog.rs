@@ -2,7 +2,9 @@ use std::{fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
 use backoff::{Backoff, BackoffConfig};
-use data_types::{CompactionLevel, ParquetFile, ParquetFileId, ParquetFileParams, PartitionId};
+use data_types::{
+    CompactionLevel, ObjectStorePathPartitionId, ParquetFile, ParquetFileId, ParquetFileParams,
+};
 use iox_catalog::interface::Catalog;
 
 use super::Commit;
@@ -32,7 +34,7 @@ impl Display for CatalogCommit {
 impl Commit for CatalogCommit {
     async fn commit(
         &self,
-        _partition_id: PartitionId,
+        _partition_id: ObjectStorePathPartitionId,
         delete: &[ParquetFile],
         upgrade: &[ParquetFile],
         create: &[ParquetFileParams],

@@ -1314,7 +1314,7 @@ async fn tiny_time_range() {
     - "L2                                                                                                                 "
     - "L2.2[1,1000] 5ns 52mb    |------------------------------------------L2.2------------------------------------------|"
     - "WARNING: file L1.1[1,2] 10ns 250mb exceeds soft limit 100mb by more than 50%"
-    - "SKIPPED COMPACTION for PartitionId(1): partition 1 has overlapped files that exceed max compact size limit 314572800. This may happen if a large amount of data has the same timestamp"
+    - "SKIPPED COMPACTION for ObjectStorePathPartitionId(1): partition 1 has overlapped files that exceed max compact size limit 314572800. This may happen if a large amount of data has the same timestamp"
     - "**** Final Output Files (0b written)"
     - "L1                                                                                                                 "
     - "L1.1[1,2] 10ns 250mb     |L1.1|                                                                                    "
