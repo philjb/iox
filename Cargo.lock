@@ -6796,7 +6796,7 @@ dependencies = [
  "rand",
  "rand_core",
  "regex",
- "regex-syntax 0.7.0",
+ "regex-syntax 0.6.29",
  "reqwest",
  "ring",
  "rustix",
